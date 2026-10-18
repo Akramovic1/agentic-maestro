@@ -1,14 +1,14 @@
 ---
 name: agentic-maestro
-description: Orchestrate software work with a strong model as the conductor and cheaper models as executors, without losing quality. Use when delegating implementation, fixes or integration to a sub-agent (any model or harness), when writing a builder/fixer/integrator brief, or when running a build -> review -> fix -> merge pipeline.
+description: "Orchestrate software work with a strong model as the conductor and cheaper models as executors, aiming to keep quality: precise briefs plus an independent review are the safeguard, not a guarantee. Use when delegating implementation, fixes or integration to a sub-agent (any model or harness), when writing a builder/fixer/integrator brief, or when running a build -> review -> fix -> merge pipeline."
 ---
 
 # agentic-maestro
 
 The strong model is the **maestro**: it holds all the context, makes every design decision, and writes
 precise parts. Cheaper models are the **players**: they execute one part exactly, without needing the
-whole score. Quality comes from the precision of the brief and from an independent review, not from
-the executor's intelligence.
+whole score. Quality is the aim: precise briefs plus an independent review are the safeguard, not a
+guarantee; the executor's intelligence only changes the cost, not the safeguard.
 
 Part A is how to write a brief. Part B is how to run the pipeline. Templates are in `templates/`,
 helper scripts in `scripts/`.

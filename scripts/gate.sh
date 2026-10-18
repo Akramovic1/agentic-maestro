@@ -7,12 +7,12 @@
 #
 # The lock is a KERNEL lock on one file per slot ($GATE_LOCK_DIR/slot.<n>), so a stale lock cannot
 # exist: when the holder dies the operating system releases it. Acquisition is non-blocking with
-# `flock -n` when the flock command exists (Linux util-linux), otherwise with a tiny embedded
-# python3 holder using fcntl.flock(LOCK_EX|LOCK_NB) (macOS). Each round tries every slot and then
-# sleeps 2 s. The command runs as a child in its own process group while the lock holder keeps the
-# lock file open; INT/TERM are forwarded to that group, the lock is kept until the child exits, and
-# the child's exit code is propagated. There is NO unlocked fallback: exit 69 if there is no lock
-# mechanism or the lock directory cannot be created or written.
+# flock(1) when it exists (Linux util-linux); otherwise a single embedded python3 program acquires
+# the slot itself with fcntl.flock(LOCK_EX|LOCK_NB). Each round tries every slot and then sleeps 2 s.
+# The command runs as a child in its own process group (its own session) while the lock stays held;
+# INT/TERM/HUP are forwarded to that group, the lock is kept until the child exits, and the child's
+# exit code is propagated (128+signal if it was killed by a signal). There is NO unlocked fallback:
+# exit 69 if there is no lock mechanism or the lock directory cannot be created or written.
 SLOTS=${GATE_SLOTS:-2}
 LOCK_DIR=${GATE_LOCK_DIR:-${TMPDIR:-/tmp}/agentic-maestro-gate}
 MAX_WAIT=${GATE_MAX_WAIT:-3600}
@@ -46,88 +46,127 @@ if [ "$#" -lt 1 ]; then
   exit 64
 fi
 
-if command -v flock >/dev/null 2>&1; then
+if command -v flock >/dev/null; then
   MECH=flock
-elif command -v python3 >/dev/null 2>&1; then
+elif command -v python3 >/dev/null; then
   MECH=python3
 else
   echo "gate.sh: neither 'flock' nor 'python3' is available; refusing to run unlocked" >&2
   exit 69
 fi
 
-if ! mkdir -p "$LOCK_DIR" 2>/dev/null; then
+if ! mkdir -p "$LOCK_DIR"; then
   echo "gate.sh: cannot create lock directory '$LOCK_DIR'; refusing to run unlocked" >&2
   exit 69
 fi
-chmod 700 "$LOCK_DIR" 2>/dev/null
+chmod 700 "$LOCK_DIR"
 probe="$LOCK_DIR/.probe.$$"
+# The probe is the only step allowed to silence stderr.
 if ! ( : >"$probe" ) 2>/dev/null; then
   echo "gate.sh: lock directory '$LOCK_DIR' is not writable; refusing to run unlocked" >&2
   exit 69
 fi
-rm -f "$probe" 2>/dev/null
+rm -f "$probe"
 
-LOCK_KIND=
-LOCK_FD=
-LOCK_HOLDER=
+if [ "$MECH" = python3 ]; then
+  # One program: acquires a slot, then runs the command as its child in a new session, forwards
+  # INT/TERM/HUP to the child's process group, keeps the lock fd until the child exits, and exits
+  # with the child's status (128+signal when killed). MAX_WAIT expiry exits 75.
+  exec python3 -c '
+import fcntl, os, signal, subprocess, sys, time
 
-# try_slot <n>: 0 acquired, 1 busy, 2 error. On success sets LOCK_KIND/LOCK_FD/LOCK_HOLDER.
-try_slot() {
-  slot="$LOCK_DIR/slot.$1"
-  LOCK_KIND=; LOCK_FD=; LOCK_HOLDER=
-  if [ "$MECH" = flock ]; then
-    exec 9>"$slot" 2>/dev/null || return 2
-    if flock -n 9 2>/dev/null; then
-      LOCK_KIND=flock; LOCK_FD=9
-      return 0
-    fi
-    exec 9>&- 2>/dev/null
-    return 1
-  fi
-  fifo="$LOCK_DIR/.ready.$$"
-  rm -f "$fifo" 2>/dev/null
-  mkfifo "$fifo" 2>/dev/null || return 2
-  # Holder: acquire the kernel lock, report 0/1/3 on the ready FIFO, then hold until told to stop
-  # (parent death shows as ppid 1).
-  python3 -c '
-import fcntl, os, sys, time
-slot = sys.argv[1]; fifo = sys.argv[2]
-try:
-    w = os.open(fifo, os.O_WRONLY)
-except OSError:
-    sys.exit(3)
-rc = 1
-orig = os.getppid()
-try:
-    f = open(slot, "a+")
+lock_dir = sys.argv[1]
+slots = int(sys.argv[2])
+max_wait = int(sys.argv[3])
+cmd = sys.argv[4:]
+
+
+def fail(code, message):
+    sys.stderr.write("gate.sh: " + message + "\n")
+    sys.exit(code)
+
+
+# Acquire a slot: non-blocking flock on each slot per round, 2 s between rounds.
+lock_fd = None
+deadline = time.monotonic() + max_wait
+while lock_fd is None:
+    for n in range(1, slots + 1):
+        path = os.path.join(lock_dir, "slot.%d" % n)
+        try:
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError as exc:
+            fail(69, "cannot use slot %d under %s: %s; refusing to run unlocked"
+                 % (n, lock_dir, exc.strerror))
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            continue
+        lock_fd = fd
+        break
+    if lock_fd is None:
+        if time.monotonic() >= deadline:
+            fail(75, "timed out after %ds waiting for a gate slot (GATE_SLOTS=%d, lock=%s)"
+                 % (max_wait, slots, lock_dir))
+        time.sleep(2)
+
+child = None
+pending = []
+
+
+def forward(signum, frame):
+    if child is None:
+        pending.append(signum)
+        return
     try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        rc = 0
+        os.killpg(child.pid, signum)
     except OSError:
-        rc = 1
-except Exception:
-    rc = 3
+        pass
+
+
+for forwarded in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(forwarded, forward)
+
 try:
-    os.write(w, str(rc).encode()); os.close(w)
+    os.nice(5)
 except OSError:
     pass
-if rc != 0:
-    sys.exit(rc)
-while True:
-    time.sleep(0.5)
-    if os.getppid() != orig:
-        sys.exit(0)
-' "$slot" "$fifo" &
-  LOCK_HOLDER=$!
-  msg=$(cat "$fifo" 2>/dev/null)
-  rm -f "$fifo" 2>/dev/null
-  if [ "$msg" = 0 ]; then
-    LOCK_KIND=python3
+
+try:
+    child = subprocess.Popen(cmd, start_new_session=True)
+except OSError as exc:
+    fail(127, "%s: %s" % (cmd[0], exc.strerror or exc))
+
+for signum in pending:
+    try:
+        os.killpg(child.pid, signum)
+    except OSError:
+        pass
+
+rc = child.wait()
+os.close(lock_fd)
+if rc < 0:
+    sys.exit(128 - rc)
+sys.exit(rc)
+' "$LOCK_DIR" "$SLOTS" "$MAX_WAIT" "$@"
+fi
+
+LOCK_FD=
+
+# try_slot <n>: 0 acquired, 1 busy, 2 error. On success sets LOCK_FD.
+try_slot() {
+  slot="$LOCK_DIR/slot.$1"
+  LOCK_FD=
+  # Writable-file test before opening on fd 9; the wrapper's stderr stays untouched afterwards.
+  if ! ( : >>"$slot" ) 2>/dev/null; then
+    return 2
+  fi
+  exec 9>"$slot" || return 2
+  if flock -n 9; then
+    LOCK_FD=9
     return 0
   fi
-  wait "$LOCK_HOLDER" 2>/dev/null
-  LOCK_HOLDER=
-  [ "$msg" = 3 ] && return 2
+  exec 9>&-
   return 1
 }
 
@@ -153,29 +192,21 @@ while [ "$acquired" = 0 ]; do
 done
 
 release() {
-  if [ -n "$LOCK_HOLDER" ]; then
-    kill -TERM "$LOCK_HOLDER" 2>/dev/null
-    wait "$LOCK_HOLDER" 2>/dev/null
-    LOCK_HOLDER=
-  fi
   if [ -n "$LOCK_FD" ]; then
-    exec 9>&- 2>/dev/null
+    exec 9>&-
     LOCK_FD=
   fi
 }
 trap 'release' EXIT
 
-forward() { kill -TERM -- -"$child" 2>/dev/null || kill -TERM "$child" 2>/dev/null; }
-trap 'forward' TERM
-trap 'forward' INT
+forward() { kill -"$1" -- -"$child" 2>/dev/null || kill -"$1" "$child" 2>/dev/null; }
+trap 'forward TERM' TERM
+trap 'forward INT' INT
+trap 'forward HUP' HUP
 
 # Run the command as a child in its own process group; the lock stays held until it exits.
 set -m
-if [ "$LOCK_KIND" = flock ]; then
-  nice -n 5 "$@" 9>&- &
-else
-  nice -n 5 "$@" &
-fi
+nice -n 5 "$@" 9>&- &
 child=$!
 set +m
 
