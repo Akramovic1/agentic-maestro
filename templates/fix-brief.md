@@ -4,7 +4,7 @@ Fix round {{ROUND}}. Do not commit.
 <workspace>
 - Baseline commit: {{SHA}}. Exact working directory: {{WORKDIR}}. Worktree {{WORKTREE}}, branch {{BRANCH}}. Never touch other directories.
 - Before every shell command: {{ENV_EXPORTS}}
-- Never pipe a command into `tail`. Write output to a log, print the exit code, then tail the log; keep the full log for the orchestrator: `cmd > /tmp/am.log 2>&1; echo "exit=$?"; tail -30 /tmp/am.log`.
+- Never pipe a command into `tail`. Write output to a UNIQUE log inside this worktree, never a shared `/tmp` path: `LOG=.agent-logs/<step>.log; mkdir -p .agent-logs; cmd > "$LOG" 2>&1; rc=$?; tail -30 "$LOG"; echo "exit=$rc"`. Keep the full log; callers judge `rc`, never the tail.
 - You may read the files in your map and their imports, callers, types and tests; no open-ended exploration.
 - Never read secrets, env or credential files; never make paid or subscription calls; never run commands marked user-only.
 - Anything else you need is a reported blocked question, not a decision.

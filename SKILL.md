@@ -54,7 +54,7 @@ Brief size (~12 KB), excerpt length and the number of quoted conventions are gui
 ### Pre-review checklist (paste only the relevant areas)
 
 Each area applies only when the feature touches that domain. The executor self-checks each relevant
-one before reporting.
+one before reporting. These are default rules; a deviation needs a written reason in the report.
 
 - **Storage**: re-verify stored data on every read with the write's own function; compare complete
   pins (id + version + content hash); recompute derived values and refuse mismatches.
@@ -72,8 +72,10 @@ one before reporting.
 
 ### Working rules every brief carries
 
-- Never pipe a command into `tail`. Write its output to a log, print the exit code, then tail the log;
-  keep the full log for the orchestrator: `cmd > /tmp/am.log 2>&1; echo "exit=$?"; tail -30 /tmp/am.log`.
+- Never pipe a command into `tail`. Write its output to a UNIQUE log inside your own worktree (for
+  example `.agent-logs/<step>.log`, git-ignored — never a shared `/tmp` path), then keep the exit
+  code: `LOG=.agent-logs/<step>.log; mkdir -p .agent-logs; cmd > "$LOG" 2>&1; rc=$?; tail -30 "$LOG";
+  echo "exit=$rc"`. Callers judge `rc`, never the tail.
 - Run tests after a group of related edits, not after each edit.
 - Read files in ranges after a grep; prefer not to read a large file whole (context cost).
 - If the same error repeats 3 times, or a command waits more than 10 minutes, stop and report
@@ -135,8 +137,9 @@ one before reporting.
 
 ### Reviewer grounding
 
-Every review receives: the original requirements/acceptance text, the brief's rulings, and explicit
-permission to challenge a ruling ("if a ruling itself is wrong, say so").
+Every review receives: the original requirements/acceptance text, the brief's rulings, read access to
+the repository and the brief's dependency contracts, and explicit permission to challenge a ruling
+("if a ruling itself is wrong, say so").
 
 ### Verification levels
 
@@ -168,8 +171,9 @@ permission to challenge a ruling ("if a ruling itself is wrong, say so").
   conventions live verbatim in `docs/conventions/<area>.md`.
 - Progress/history files keep recent milestones; older ones are archived verbatim.
 - Regenerate `docs/CODEMAP.md` after merges that add, move or rename files.
-- As orchestrator, read only the tails of executor and reviewer reports, and use the excerpt and
-  code-map tools instead of opening large files.
+- As orchestrator, read only the tails of executor and reviewer reports by default — but read the
+  FULL report whenever the verdict is not PASS or any exit code is non-zero — and use the excerpt
+  and code-map tools instead of opening large files.
 
 ### Model choice
 
@@ -186,7 +190,7 @@ permission to challenge a ruling ("if a ruling itself is wrong, say so").
 
 - Up to 4 executors at once (they are mostly idle while waiting on the model).
 - At most 2 heavy check commands at any moment, through a lock script (`scripts/gate.sh`; `GATE_SLOTS`,
-  `GATE_LOCK`, `GATE_MAX_WAIT`).
+  `GATE_LOCK_DIR`, `GATE_MAX_WAIT`).
 - Container runtimes capped (for example 2 CPUs). Never run a full battery alongside executors. Use
   `nice -n 5`, not background QoS (background priority made checks 3–4 times slower).
 - Set executors to maximum reasoning effort for new builds; high is enough for fix rounds and

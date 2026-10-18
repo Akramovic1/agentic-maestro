@@ -1,8 +1,9 @@
 # agentic-maestro
 
 A Claude Code skill for **orchestrated delegation**: a strong model conducts (plans, rules, arbitrates,
-merges), cheaper models execute, and quality holds because every executor gets a precise, self-contained
-brief and every result passes an independent review.
+merges), cheaper models execute, and the workflow aims to preserve quality — review is the safeguard,
+not a guarantee. Every executor gets a precise, self-contained brief and every result passes an
+independent review.
 
 It distils what was measured while building a large TypeScript monorepo with a strong orchestrator,
 a low-cost executor (DeepSeek v4.1 Flash) and Codex as reviewer. The main levers:
@@ -23,12 +24,13 @@ a low-cost executor (DeepSeek v4.1 Flash) and Codex as reviewer. The main levers
 - `SKILL.md`: the skill. Part A is writing briefs; Part B is running the pipeline.
 - `templates/`: brief, fix-brief and integration-brief templates.
 - `scripts/codemap.mjs`: generates `docs/CODEMAP.md` (per package: source files with header-comment
-  purpose and size, plus main exports — exports are approximate, matched by regex).
-  `node scripts/codemap.mjs <repo> [groups...]`
+  purpose and size, plus main exports — exports are approximate, matched by regex). Targets JS/TS
+  workspaces only: child packages with a `package.json` under the given group dirs, sources under
+  `src/` or `app/`; not arbitrary layouts. `node scripts/codemap.mjs <repo> [groups...]`
 - `scripts/excerpt.sh`: a code excerpt for a brief. `excerpt.sh <file> <regex> [lines]`
 - `scripts/conv.sh`: quotes matching convention bullets with their continuation lines.
   `conv.sh <dir-or-file> <keyword>...`
-- `scripts/gate.sh`: a machine-wide lock for heavy check commands (`GATE_SLOTS`, `GATE_LOCK`,
+- `scripts/gate.sh`: a machine-wide lock for heavy check commands (`GATE_SLOTS`, `GATE_LOCK_DIR`,
   `GATE_MAX_WAIT`).
 
 ## Install
@@ -41,4 +43,5 @@ ln -s ~/Documents/GitHub/agentic-maestro ~/.claude/skills/agentic-maestro
 
 ## Portability
 
-Tested on macOS with Bash 3.2 and Node 24. Linux is untested.
+Tested on macOS with Bash 3.2 and Node 24. The scripts were also exercised on Linux in a
+`debian:bookworm-slim` container (util-linux `flock` via `docker run`).

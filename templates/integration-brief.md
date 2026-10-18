@@ -2,7 +2,7 @@
 <workspace>
 - Work ONLY in {{WORKTREE}} (branch {{BRANCH}} — the integration branch — based on {{BASE}}: {{CURRENT_NUMBERING}}).
 - Before every shell command: {{ENV_EXPORTS}}
-- Never pipe a command into `tail`. Write output to a log, print the exit code, then tail the log; keep the full log for the orchestrator: `cmd > /tmp/am.log 2>&1; echo "exit=$?"; tail -30 /tmp/am.log`.
+- Never pipe a command into `tail`. Write output to a UNIQUE log inside this worktree, never a shared `/tmp` path: `LOG=.agent-logs/<step>.log; mkdir -p .agent-logs; cmd > "$LOG" 2>&1; rc=$?; tail -30 "$LOG"; echo "exit=$rc"`. Keep the full log; callers judge `rc`, never the tail.
 - Authority: you may commit and push ONLY on this integration branch, with the exact messages below. The orchestrator owns merging to main; never touch main.
 - Never read secrets, env or credential files; never make paid or subscription calls.
 </workspace>
@@ -19,6 +19,6 @@ Seams in one commit "{{SEAM_MSG}}".
 whole-repo typecheck, lint, build (concurrency 1)
 </gates>
 <review>
-The final integrated commit (SHA) is reviewed by the independent reviewer before merging to main. The reviewer also receives the original requirements/acceptance, these rulings, and permission to challenge a ruling (if a ruling itself is wrong, say so).
+The final integrated commit (SHA) is reviewed by the independent reviewer before merging to main. The reviewer also receives the original requirements/acceptance, these rulings, read access to the repository and the merged dependency contracts, and permission to challenge a ruling (if a ruling itself is wrong, say so).
 </review>
 <report>At most 8 lines: commits, conflicts and resolutions, renumbering, seams, each gate with counts and exit code. Blocked questions: list each.</report>

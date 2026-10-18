@@ -17,6 +17,12 @@ case "$N" in
     exit 2
     ;;
 esac
+# Read the count base 10 ('08' is 8); the value must be >= 1, i.e. match ^[1-9][0-9]*$.
+N=$((10#$N))
+if [ "$N" -lt 1 ]; then
+  echo "excerpt.sh: lines must be a positive integer (got '$N')" >&2
+  exit 2
+fi
 
 grep -qE -- "$P" "$F" 2>/dev/null
 st=$?

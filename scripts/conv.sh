@@ -1,9 +1,11 @@
 #!/bin/bash
 # Quotes the convention bullets ("- " lines) that match ANY keyword (case-insensitive, fixed
-# strings), verbatim, with each bullet's indented continuation lines, so a brief carries only the
-# rules a task needs. Every output line is prefixed with its source file name.
+# strings), verbatim, so a brief carries only the rules a task needs. Each quoted bullet keeps the
+# heading of the section it came from and all of its indented continuation lines; a keyword that
+# matches only a continuation line still returns the whole bullet. Every output line is prefixed
+# with its source file name.
 # Usage: conv.sh <conventions-dir-or-file> <keyword> [keyword ...]
-# Exit: 0 ok, 2 usage or missing input.
+# Exit: 0 ok; 2 usage or missing input; otherwise the (awk) quoting failure's exit code.
 if [ "$#" -lt 2 ]; then
   echo "conv.sh: usage: conv.sh <conventions-dir-or-file> <keyword> [keyword ...]" >&2
   exit 2
@@ -34,15 +36,34 @@ for k in "$@"; do KW="${KW}${DELIM}${k}"; done
 echo "<conventions>"
 echo "Binding project conventions for this task, quoted verbatim (do not open the conventions files, the instruction file, the spec or the decision records):"
 awk -v kw="$KW" -v d="$DELIM" '
-BEGIN { n = split(kw, parts, d); for (i = 1; i <= n; i++) if (parts[i] != "") kws[++m] = tolower(parts[i]) }
-FNR == 1 { cap = 0 }
-/^- / {
-  low = tolower($0); hit = 0
-  for (i = 1; i <= m; i++) if (index(low, kws[i]) > 0) { hit = 1; break }
-  if (hit) { cap = 1; print FILENAME ": " $0 } else cap = 0
-  next
+function hits(s,   i, low) {
+  low = tolower(s)
+  for (i = 1; i <= m; i++) if (index(low, kws[i]) > 0) return 1
+  return 0
 }
-cap && /^[ \t]/ { print FILENAME ": " $0; next }
-cap { cap = 0 }
+function flush(   i) {
+  if (!inblk) return
+  if (hit) {
+    if (blkhead != "") print curfile ": " blkhead
+    for (i = 1; i <= k; i++) print curfile ": " blk[i]
+  }
+  inblk = 0; k = 0; hit = 0
+}
+BEGIN {
+  n = split(kw, parts, d)
+  for (i = 1; i <= n; i++) if (parts[i] != "") kws[++m] = tolower(parts[i])
+  heading = ""
+}
+FNR == 1 { flush(); heading = ""; curfile = FILENAME }
+/^- / { flush(); inblk = 1; k = 1; blk[1] = $0; blkhead = heading; hit = hits($0); next }
+inblk && /^[ \t]/ { blk[++k] = $0; if (hits($0)) hit = 1; next }
+{ flush() }
+/^#/ { heading = $0 }
+END { flush() }
 ' "${files[@]}"
+st=$?
+if [ "$st" -ne 0 ]; then
+  echo "conv.sh: quoting failed (awk exit $st)" >&2
+  exit "$st"
+fi
 echo "</conventions>"

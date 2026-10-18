@@ -2,6 +2,8 @@
 // first doc-comment sentence, main exports), so builders navigate without exploring.
 // Usage: node scripts/codemap.mjs <repo-root> [group ...]   (writes <repo-root>/docs/CODEMAP.md)
 // Groups default to apps, packages, packages/adapters; any project can pass its own (e.g. src services libs).
+// TARGETS JS/TS WORKSPACES ONLY: child packages that each have a package.json under the given group
+// directories, with sources under src/ or app/. It is not a general layout reader.
 // Exports are APPROXIMATE: they are matched with regexes, not a real parser. Symlinked directories are
 // never followed. Regenerate after merges that add, move or rename files.
 import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
