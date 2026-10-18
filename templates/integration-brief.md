@@ -7,7 +7,7 @@
 - Never read secrets, env or credential files; never make paid or subscription calls.
 </workspace>
 <task>
-1. `git merge --no-ff origin/{{BRANCH_A}}` — {{WHAT_A}}. Renumber: {{RENUMBER_A}} (every reference). Message: "{{MSG_A}}".
+1. `git merge --no-ff origin/{{BRANCH_A}}` (must contain {{SHA_A}}; check with `git merge-base --is-ancestor {{SHA_A}} HEAD` after merging, else stop and report) — {{WHAT_A}}. Renumber: {{RENUMBER_A}} (every reference). Message: "{{MSG_A}}".
 2. …
 Moved code since these branches were cut: {{MOVES}}.
 After the merge these behaviours/invariants must hold, each proved by a test: {{INVARIANTS}}.
