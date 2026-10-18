@@ -172,6 +172,10 @@ the repository and the brief's dependency contracts, and explicit permission to 
 - Reviewer prompts: delta-scoped, "keep it tight, budget for the final report", findings as P1/P2/P3
   with file:line and a verdict. Frame as correctness and input validation, not attack wording.
 - Some sandboxes cannot commit inside git worktrees: the orchestrator commits.
+- Push every lane with an explicit refspec (`git push -u origin HEAD:refs/heads/<branch>`), check the
+  exit code, and check that local HEAD equals the remote branch: a stacked worktree branch inherits its
+  parent's upstream, so a bare `git push` fails or targets the wrong branch. Integration briefs name the
+  exact commit SHA each merged branch must contain.
 
 ### Keep context small
 
