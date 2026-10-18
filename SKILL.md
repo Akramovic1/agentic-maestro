@@ -171,7 +171,10 @@ the repository and the brief's dependency contracts, and explicit permission to 
 - Run CLI reviewers non-interactively with `< /dev/null` (some wait for stdin forever).
 - Reviewer prompts: delta-scoped, "keep it tight, budget for the final report", findings as P1/P2/P3
   with file:line and a verdict. Frame as correctness and input validation, not attack wording.
-- Some sandboxes cannot commit inside git worktrees: the orchestrator commits.
+- Some sandboxes cannot commit inside git worktrees: the orchestrator commits. Such an executor
+  cannot merge either (its "merge" is only working-tree content): the orchestrator merges the base
+  branch and commits the merge BEFORE launching the executor, or records the result as one
+  two-parent merge commit afterwards, never as a plain commit.
 - Push every lane with an explicit refspec (`git push -u origin HEAD:refs/heads/<branch>`), check the
   exit code, and check that local HEAD equals the remote branch: a stacked worktree branch inherits its
   parent's upstream, so a bare `git push` fails or targets the wrong branch. Integration briefs name the
