@@ -57,13 +57,17 @@ Each area applies only when the feature touches that domain. The executor self-c
 one before reporting. These are default rules; a deviation needs a written reason in the report.
 
 - **Storage**: re-verify stored data on every read with the write's own function; compare complete
-  pins (id + version + content hash); recompute derived values and refuse mismatches.
+  pins (id + version + content hash); recompute derived values and refuse mismatches. Anything
+  shown or applied against a versioned record (findings, labels, proposals) carries the complete pin
+  of the version it judged: render it only on that version, and refuse an apply whose pin is stale.
+  Read shared records through their verifying reader, never by parsing their bytes directly.
 - **Input**: never truncate, clamp or default — refuse with a fixed, value-free error; check bounds
   BEFORE expensive work; parse untrusted input strictly (model output, media, tool stderr, files); no
   free-text parsing where a structured channel exists; no caller-chosen destinations, keys or paths.
 - **Media / sandbox**: no large reads inside locks or transactions; no unbounded lists from external
   data.
-- **Concurrency**: recording is idempotent, keyed per step (look up the recorded result first); an
+- **Concurrency**: recording is idempotent, keyed per step (look up the recorded result first, and
+  test a replay by COUNTING stored results, not only model calls); an
   external side effect uses the provider's own idempotency key where one exists; concurrent writers
   tested with two real connections.
 - **Tests**: negative tests use REAL objects of the wrong kind, owner or state, not only nonexistent
