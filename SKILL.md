@@ -162,6 +162,10 @@ the repository and the brief's dependency contracts, and explicit permission to 
 
 ### Tooling hygiene
 
+- Before the first executor runs, make sure the project ignores `.agent-logs/`; before committing an
+  executor's work, check `git status` for stray files (logs, scratch scripts) instead of a blind
+  `git add -A`.
+
 - Track every background job (a watcher or tracked run); never fire-and-forget with `&`. A "running"
   status with a dead process is orphaned: cancel and relaunch.
 - Run CLI reviewers non-interactively with `< /dev/null` (some wait for stdin forever).
