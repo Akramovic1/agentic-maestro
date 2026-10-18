@@ -2,7 +2,8 @@
 # Machine-wide gate lock: at most $GATE_SLOTS (default 2) heavy check commands at once across all
 # lanes. Usage: gate.sh <command...>.
 #   GATE_SLOTS    number of slots (positive integer, base 10; '08' is 8; default 2)
-#   GATE_LOCK_DIR lock directory (default ${TMPDIR:-/tmp}/agentic-maestro-gate, created 0700)
+#   GATE_LOCK_DIR lock directory (default ${TMPDIR:-/tmp}/agentic-maestro-gate-$(id -u), created
+#                 0700 and verified: real directory, owned by us, no group/other access)
 #   GATE_MAX_WAIT max seconds to wait for a slot (positive integer, default 3600; on timeout exit 75)
 #
 # The lock is a KERNEL lock on one file per slot ($GATE_LOCK_DIR/slot.<n>), so a stale lock cannot
@@ -12,9 +13,10 @@
 # The command runs as a child in its own process group (its own session) while the lock stays held;
 # INT/TERM/HUP are forwarded to that group, the lock is kept until the child exits, and the child's
 # exit code is propagated (128+signal if it was killed by a signal). There is NO unlocked fallback:
-# exit 69 if there is no lock mechanism or the lock directory cannot be created or written.
+# exit 69 if there is no lock mechanism or the lock directory cannot be created or written, or if
+# the lock directory or a slot file is not safe (symlink, foreign owner, group/other access).
 SLOTS=${GATE_SLOTS:-2}
-LOCK_DIR=${GATE_LOCK_DIR:-${TMPDIR:-/tmp}/agentic-maestro-gate}
+LOCK_DIR=${GATE_LOCK_DIR:-${TMPDIR:-/tmp}/agentic-maestro-gate-$(id -u)}
 MAX_WAIT=${GATE_MAX_WAIT:-3600}
 
 case "$SLOTS" in
@@ -55,11 +57,36 @@ else
   exit 69
 fi
 
-if ! mkdir -p "$LOCK_DIR"; then
+if ! mkdir -p -m 700 "$LOCK_DIR"; then
   echo "gate.sh: cannot create lock directory '$LOCK_DIR'; refusing to run unlocked" >&2
   exit 69
 fi
-chmod 700 "$LOCK_DIR"
+
+# The lock directory sits in a shared temp location, so it must not be redirectable: a symlink
+# would let another user point the gate at their own directory, and group/other access would let
+# them read or replace slot files. Verify instead of repairing (chmod would hide a bad directory).
+dir_problem=
+if [ -L "$LOCK_DIR" ] || [ ! -d "$LOCK_DIR" ]; then
+  dir_problem="it is not a real directory"
+elif [ ! -O "$LOCK_DIR" ]; then
+  dir_problem="it is not owned by the current user"
+else
+  # GNU stat first, then BSD stat; both print the permission bits as octal digits.
+  dir_mode=$(stat -c %a "$LOCK_DIR" 2>/dev/null || stat -f %Lp "$LOCK_DIR" 2>/dev/null)
+  case "$dir_mode" in
+    '' | *[!0-7]*) dir_problem="its mode cannot be determined" ;;
+    *)
+      if [ "${dir_mode#"${dir_mode%??}"}" != 00 ]; then
+        dir_problem="its mode $dir_mode allows group or other access"
+      fi
+      ;;
+  esac
+fi
+if [ -n "$dir_problem" ]; then
+  echo "gate.sh: lock directory '$LOCK_DIR' is not safe: $dir_problem (need a real directory owned by you with mode 0700); refusing to run unlocked" >&2
+  exit 69
+fi
+
 probe="$LOCK_DIR/.probe.$$"
 # The probe is the only step allowed to silence stderr.
 if ! ( : >"$probe" ) 2>/dev/null; then
@@ -73,7 +100,7 @@ if [ "$MECH" = python3 ]; then
   # INT/TERM/HUP to the child's process group, keeps the lock fd until the child exits, and exits
   # with the child's status (128+signal when killed). MAX_WAIT expiry exits 75.
   exec python3 -c '
-import fcntl, os, signal, subprocess, sys, time
+import errno, fcntl, os, signal, stat, subprocess, sys, time
 
 lock_dir = sys.argv[1]
 slots = int(sys.argv[2])
@@ -86,15 +113,39 @@ def fail(code, message):
     sys.exit(code)
 
 
+# Every slot is checked up front, not only the one this run happens to take: a symlink here means
+# the lock directory has been tampered with, and opening it would write to a foreign file. A
+# non-regular file matters too (a FIFO would block the open, a directory cannot be opened).
+for n in range(1, slots + 1):
+    path = os.path.join(lock_dir, "slot.%d" % n)
+    try:
+        st = os.lstat(path)
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            continue
+        fail(69, "cannot inspect slot %d under %s: %s; refusing to run unlocked"
+             % (n, lock_dir, exc.strerror))
+    if stat.S_ISLNK(st.st_mode):
+        fail(69, "slot %d under %s is a symlink; refusing to run unlocked" % (n, lock_dir))
+    if not stat.S_ISREG(st.st_mode):
+        fail(69, "slot %d under %s is not a regular file; refusing to run unlocked"
+             % (n, lock_dir))
+
 # Acquire a slot: non-blocking flock on each slot per round, 2 s between rounds.
 lock_fd = None
 deadline = time.monotonic() + max_wait
 while lock_fd is None:
     for n in range(1, slots + 1):
         path = os.path.join(lock_dir, "slot.%d" % n)
+        # O_NOFOLLOW: a symlinked slot would send the lock (and the append) to a file we do not own.
         try:
-            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+            fd = os.open(path,
+                         os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW,
+                         0o600)
         except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                fail(69, "slot %d under %s is a symlink; refusing to run unlocked"
+                     % (n, lock_dir))
             fail(69, "cannot use slot %d under %s: %s; refusing to run unlocked"
                  % (n, lock_dir, exc.strerror))
         try:
@@ -153,15 +204,28 @@ fi
 
 LOCK_FD=
 
-# try_slot <n>: 0 acquired, 1 busy, 2 error. On success sets LOCK_FD.
+# try_slot <n>: 0 acquired, 1 busy, 2 error (SLOT_PROBLEM says why). On success sets LOCK_FD.
 try_slot() {
   slot="$LOCK_DIR/slot.$1"
   LOCK_FD=
-  # Writable-file test before opening on fd 9; the wrapper's stderr stays untouched afterwards.
-  if ! ( : >>"$slot" ) 2>/dev/null; then
+  SLOT_PROBLEM=
+  # A symlink at a slot path would redirect the lock, and the append below, to a file we do not own;
+  # anything but a regular file (a FIFO) could block the append instead of failing.
+  if [ -L "$slot" ]; then
+    SLOT_PROBLEM="slot.$1 is a symlink"
     return 2
   fi
-  exec 9>"$slot" || return 2
+  if [ -e "$slot" ] && [ ! -f "$slot" ]; then
+    SLOT_PROBLEM="slot.$1 is not a regular file"
+    return 2
+  fi
+  # Writable-file test before opening on fd 9; the wrapper's stderr stays untouched afterwards.
+  if ! ( : >>"$slot" ) 2>/dev/null; then
+    SLOT_PROBLEM="slot.$1 is not writable"
+    return 2
+  fi
+  # Append (never truncate): an existing slot file must keep its contents.
+  exec 9>>"$slot" || { SLOT_PROBLEM="slot.$1 cannot be opened"; return 2; }
   if flock -n 9; then
     LOCK_FD=9
     return 0
@@ -169,6 +233,23 @@ try_slot() {
   exec 9>&-
   return 1
 }
+
+# Every slot is checked up front, not only the one this run happens to take: a slot file this run
+# never reaches could still be handed to a later round, and a symlink means the directory is not
+# ours to trust. try_slot re-checks before opening, so this is for the slots we skip.
+s=1
+while [ "$s" -le "$SLOTS" ]; do
+  slot="$LOCK_DIR/slot.$s"
+  if [ -L "$slot" ]; then
+    echo "gate.sh: slot $s under '$LOCK_DIR' is a symlink; refusing to run unlocked" >&2
+    exit 69
+  fi
+  if [ -e "$slot" ] && [ ! -f "$slot" ]; then
+    echo "gate.sh: slot $s under '$LOCK_DIR' is not a regular file; refusing to run unlocked" >&2
+    exit 69
+  fi
+  s=$((s + 1))
+done
 
 acquired=0
 deadline=$(( $(date +%s) + MAX_WAIT ))
@@ -178,7 +259,7 @@ while [ "$acquired" = 0 ]; do
     try_slot "$s"; r=$?
     if [ "$r" = 0 ]; then acquired=1; break; fi
     if [ "$r" = 2 ]; then
-      echo "gate.sh: cannot use slot $s under '$LOCK_DIR'; refusing to run unlocked" >&2
+      echo "gate.sh: cannot use slot $s under '$LOCK_DIR' ($SLOT_PROBLEM); refusing to run unlocked" >&2
       exit 69
     fi
     s=$((s + 1))

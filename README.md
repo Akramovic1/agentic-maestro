@@ -31,7 +31,7 @@ a low-cost executor (DeepSeek v4.1 Flash) and Codex as reviewer. The main levers
 - `scripts/conv.sh`: quotes matching convention bullets with their continuation lines.
   `conv.sh <dir-or-file> <keyword>...`
 - `scripts/gate.sh`: a machine-wide lock for heavy check commands (`GATE_SLOTS`, `GATE_LOCK_DIR`,
-  `GATE_MAX_WAIT`).
+  `GATE_MAX_WAIT`). The lock directory is per user and verified (real, owned, 0700) before use.
 
 ## Install
 
