@@ -16,7 +16,12 @@
 ![OpenCode](https://img.shields.io/badge/OpenCode-v1%20%26%20v2-f59e0b)
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-standard-6e56cf)
 
-<img src="assets/promo.gif" alt="agentic-maestro：指挥模型把简报发给 Claude Code、Codex 和 OpenCode 上的执行者，报告交给独立审查者" width="860">
+<picture>
+  <source srcset="assets/promo.webp" type="image/webp">
+  <img src="assets/promo.gif" alt="agentic-maestro：指挥模型把简报发给 Claude Code、Codex 和 OpenCode 上的执行者，独立审查者检查每个结果" width="880">
+</picture>
+
+<sub><a href="assets/promo.mp4">观看高清版（MP4）</a></sub>
 
 </div>
 
