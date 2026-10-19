@@ -6,8 +6,7 @@
 #   <allowed> is a path or a bash glob relative to the worktree root ('packages/a/src/*' also
 #   matches deeper files, since * matches '/'); a trailing '/' allows a whole directory.
 # Ignored: .agent-logs/*.log (executor logs). Renames list both paths.
-# Exit: 0 every change is inside the map; 1 out-of-map paths (printed, one per line); 2 usage, git
-# error, or a file flagged assume-unchanged/skip-worktree (such flags hide edits, so the check refuses).
+# Exit: 0 every change is inside the map; 1 out-of-map paths (printed, one per line); 2 usage or git error.
 if [ "$#" -lt 3 ]; then
   echo "scope-check.sh: usage: scope-check.sh <worktree> <base-sha> <allowed> [allowed ...]" >&2
   exit 2
@@ -19,23 +18,22 @@ if ! git -C "$W" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
   exit 2
 fi
 
-# Renames are listed as both paths (--no-renames), so moving a file OUT of the map is caught; the
-# worktree's own config cannot change that (renames, path quoting). NUL-delimited, so any file name works.
-# Git-ignored new files are not listed: they cannot enter a commit, and an edit to .gitignore that
-# would hide files is itself a tracked change outside the map.
-G=(git -C "$W" -c diff.renames=false -c core.quotePath=false)
-# Fail closed on index flags that hide edits from diff: assume-unchanged (lowercase tag in
-# `ls-files -v`) and skip-worktree ('S'). An executor could set them to slip a change past this check.
-hidden=$("${G[@]}" ls-files -v | grep -E '^([a-z]|S) ' | cut -c3-) || [ $? -eq 1 ] || { echo "scope-check.sh: git failed in $W" >&2; exit 2; }
-if [ -n "$hidden" ]; then
-  echo "scope-check.sh: files with assume-unchanged/skip-worktree flags (edits hidden from diff); clear them and rerun:" >&2
-  printf '%s\n' "$hidden" >&2
+# Content, not the worktree's index: a throwaway index is loaded from BASE and every working-tree
+# file is re-hashed into it, so index flags (assume-unchanged, skip-worktree), cached stat data and
+# fsmonitor cannot hide an edit. Renames are listed as both paths, so moving a file OUT of the map is
+# caught. Git-ignored new files are not listed: they cannot enter a commit, and an edit to .gitignore
+# that would hide files is itself a change outside the map. NUL-delimited, so any file name works.
+G=(git -C "$W" -c diff.renames=false -c core.quotePath=false -c core.fsmonitor=false -c core.untrackedCache=false)
+tmp=$(mktemp -d) || exit 2
+trap 'rm -rf "$tmp"' EXIT
+export GIT_INDEX_FILE="$tmp/index"
+if ! "${G[@]}" read-tree "$BASE" || ! "${G[@]}" add -A -- . \
+  || ! "${G[@]}" diff --cached --no-renames --name-only -z "$BASE" -- > "$tmp/list"; then
+  echo "scope-check.sh: git failed in $W" >&2
   exit 2
 fi
-list=$(mktemp) || exit 2
-trap 'rm -f "$list"' EXIT
-{ "${G[@]}" diff --no-renames --name-only -z "$BASE" -- && "${G[@]}" ls-files -z --others --exclude-standard; } > "$list" \
-  || { echo "scope-check.sh: git failed in $W" >&2; exit 2; }
+unset GIT_INDEX_FILE
+list="$tmp/list"
 
 bad=0
 seen=$'\n'
