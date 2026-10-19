@@ -99,6 +99,22 @@ flowchart LR
 
 </div>
 
+<div dir="rtl">
+
+**الأسرع:** أمر واحد عبر [skills CLI](https://skills.sh) المفتوح (يكتشف Claude Code وCodex وOpenCode وغيرها):
+
+</div>
+
+```bash
+npx skills add Akramovic1/agentic-maestro
+```
+
+<div dir="rtl">
+
+**أو انسخ المستودع واربطه** (يتحدث مع `git pull`):
+
+</div>
+
 ```bash
 git clone https://github.com/Akramovic1/agentic-maestro.git ~/agentic-maestro
 cd ~/agentic-maestro

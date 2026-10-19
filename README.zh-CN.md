@@ -79,6 +79,14 @@ flowchart LR
 
 依赖：`git`、`bash`（3.2+）、运行脚本所需的 Node.js 18+，以及下列至少一种代理工具。
 
+**最快：** 通过开放的 [skills CLI](https://skills.sh) 一条命令安装（自动识别 Claude Code、Codex、OpenCode 等代理）：
+
+```bash
+npx skills add Akramovic1/agentic-maestro
+```
+
+**或克隆并链接**（随 `git pull` 更新）：
+
 ```bash
 git clone https://github.com/Akramovic1/agentic-maestro.git ~/agentic-maestro
 cd ~/agentic-maestro

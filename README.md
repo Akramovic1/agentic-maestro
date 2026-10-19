@@ -84,6 +84,14 @@ design questions. See [SKILL.md](SKILL.md) for the full playbook.
 
 Requirements: `git`, `bash` (3.2+), Node.js 18+ for the scripts, and at least one of the agents below.
 
+**Fastest:** one command, via the open [skills CLI](https://skills.sh) (detects Claude Code, Codex, OpenCode and other agents):
+
+```bash
+npx skills add Akramovic1/agentic-maestro
+```
+
+**Or clone and link** (follows `git pull` for updates):
+
 ```bash
 git clone https://github.com/Akramovic1/agentic-maestro.git ~/agentic-maestro
 cd ~/agentic-maestro
