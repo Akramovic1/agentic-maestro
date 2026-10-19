@@ -25,7 +25,7 @@ fi
 # that would hide files is itself a change outside the map. NUL-delimited, so any file name works.
 G=(git -C "$W" -c diff.renames=false -c core.quotePath=false -c core.fsmonitor=false -c core.untrackedCache=false)
 tmp=$(mktemp -d) || exit 2
-trap 'rm -rf "$tmp"' EXIT
+trap 'rm -f "$tmp/index" "$tmp/index.lock" "$tmp/list"; rmdir "$tmp" 2>/dev/null' EXIT
 export GIT_INDEX_FILE="$tmp/index"
 if ! "${G[@]}" read-tree "$BASE" || ! "${G[@]}" add -A -- . \
   || ! "${G[@]}" diff --cached --no-renames --name-only -z "$BASE" -- > "$tmp/list"; then

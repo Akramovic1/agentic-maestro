@@ -84,6 +84,8 @@ const cmd = opts.bin ?? opts.harness;
 const present = spawnSync('sh', ['-c', 'command -v "$1"', 'sh', cmd]).status === 0;
 // PWD must match cwd: OpenCode v2 takes its project directory from $PWD, so an inherited PWD would
 // point the agent at the orchestrator's checkout instead of --dir (observed).
+// The caller's environment is passed through unchanged so the agent CLI finds its PATH and login;
+// this script reads no variables from it and makes no network calls of its own.
 const env = { ...process.env, PWD: dir };
 let args;
 if (opts.harness === 'claude') {

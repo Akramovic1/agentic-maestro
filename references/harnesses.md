@@ -52,7 +52,7 @@ node scripts/spawn.mjs --harness claude --model sonnet --effort high \
   The executor needs no tools beyond the built-ins: its context is the brief. `--no-lean` restores the
   full setup (an executor that needs an MCP server: pass `-- --mcp-config <file>` instead).
 - `--setting-sources project,local` also drops user plugins (fewer tokens) but also drops user-level
-  permission rules; `--bare` is leanest but needs `ANTHROPIC_API_KEY` (no OAuth login).
+  permission rules; `--bare` is leanest but needs an API key instead of the usual login.
 
 ## Codex
 
@@ -101,7 +101,7 @@ spawn.mjs reads `opencode --version` and builds the command for the installed ma
   executor's context; `--no-lean` keeps them.
 - Session id is the `sessionID` of the events (`ses_…`); the report is the concatenated `text`
   events. v2 emits no token or cost events, so those ledger columns stay empty.
-- Several installs on one machine (a curl install, npm globals, Homebrew) can shadow each other on
+- Several installs on one machine (an installer script, npm globals, Homebrew) can shadow each other on
   PATH, and an old binary cannot read a database migrated by v2. Keep one install, or pin it with
   `--bin /opt/homebrew/bin/opencode`.
 

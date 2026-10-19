@@ -28,7 +28,9 @@ const LARGE = 200;
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', '.next', '.turbo', 'coverage', 'generated',
   'vendor', 'target', '.venv', 'venv', '__pycache__', 'test', 'tests', '__tests__', '__mocks__', 'e2e',
   'fixtures', '.git']);
-const SOURCE_EXT = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|go|rs|rb|java|kt|swift|cs|php|c|cc|cpp|h|hpp|sh|sql)$/;
+const SOURCE_EXTS = new Set(['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs', 'py', 'go', 'rs', 'rb', 'java', 'kt',
+  'swift', 'cs', 'php', 'c', 'cc', 'cpp', 'h', 'hpp', 'sh', 'sql']);
+const isSource = (name) => SOURCE_EXTS.has(name.slice(name.lastIndexOf('.') + 1)) && name.includes('.');
 const isTestFile = (name) =>
   /\.(test|spec)\.[^.]+$/.test(name) || /^test_.*\.py$/.test(name) || /_test\.(go|py)$/.test(name) || /\.d\.ts$/.test(name);
 const isSkippedPath = (rel) => rel.split('/').some((seg) => SKIP_DIRS.has(seg));
@@ -77,7 +79,7 @@ const walk = (dir, out) => {
     if (d.isSymbolicLink()) continue; // never follow symlinks (files or directories)
     if (d.isDirectory()) {
       if (!SKIP_DIRS.has(d.name)) walk(p, out);
-    } else if (SOURCE_EXT.test(d.name) && !isTestFile(d.name)) out.push(p);
+    } else if (isSource(d.name) && !isTestFile(d.name)) out.push(p);
   }
   return out;
 };
@@ -138,7 +140,7 @@ function genericMap(dirs) {
     process.exit(2);
   }
   const files = tracked
-    .filter((f) => SOURCE_EXT.test(f) && !isTestFile(f.split('/').pop()) && !isSkippedPath(f))
+    .filter((f) => isSource(f.split('/').pop()) && !isTestFile(f.split('/').pop()) && !isSkippedPath(f))
     .filter((f) => dirs.length === 0 || dirs.some((d) => f === d || f.startsWith(d.replace(/\/$/, '') + '/')))
     .filter((f) => {
       try {
