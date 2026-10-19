@@ -1,25 +1,34 @@
-<task>
-Fix round {{ROUND}}. Do not commit.
-</task>
+<rules>
+{{RULES}}
+</rules>
+<role>
+Fix round {{ROUND}}. You are a fresh session: everything you need is in this brief. Fix exactly the findings below with the given rulings and nothing else. Do not commit.
+</role>
+{{CONVENTIONS}}
 <workspace>
-- Baseline commit: {{SHA}}. Exact working directory: {{WORKDIR}}. Worktree {{WORKTREE}}, branch {{BRANCH}}. Never touch other directories.
+- Baseline commit: {{SHA}}. Exact working directory: {{WORKDIR}}. Branch {{BRANCH}}. Never touch other directories.
 - Before every shell command: {{ENV_EXPORTS}}
-- Never pipe a command into `tail`. Write output to a UNIQUE log inside this worktree, never a shared `/tmp` path: `LOG=.agent-logs/<step>.log; mkdir -p .agent-logs; cmd > "$LOG" 2>&1; rc=$?; tail -30 "$LOG"; echo "exit=$rc"`. Keep the full log; callers judge `rc`, never the tail.
-- You may read the files in your map and their imports, callers, types and tests; no open-ended exploration.
-- Never read secrets, env or credential files; never make paid or subscription calls; never run commands marked user-only.
-- Anything else you need is a reported blocked question, not a decision.
 </workspace>
 <findings>
-F1 ({{SEVERITY}}) "{{FINDING_TEXT}}" ({{FILE}}:{{LINE}})
-   Ruling: {{EXACT_FIX}}. Test: {{TEST_TO_ADD}}.
-F2 …
-{{STRUCTURAL_RULING_IF_3RD_ROUND}}
+Each finding is quoted from the review, then the orchestrator's exact ruling and the test that proves it:
+{{FINDINGS}}
+{{STRUCTURAL_RULING}}
 </findings>
 <still-applies>
 Previous rulings that still apply: {{PRIOR_RULINGS}}
 Invariants that must keep holding (each still tested): {{INVARIANTS}}
-Conventions that apply: {{CONVENTIONS}}
 </still-applies>
-<map>Only these files: …</map>
-<gates>Exact commands, per-package only (tests, typecheck, lint of the packages you change), once at the end: {{GATE_COMMANDS}}</gates>
-<report>At most {{N}} lines: one per finding, gate counts and exit codes. Blocked questions: list each. Do not commit.</report>
+<map>Files you may change (nothing else): {{FILES}}</map>
+<gates>
+Exact commands, per-package only (tests, typecheck, lint of the packages you change), one at a time, once at the end:
+{{GATE_COMMANDS}}
+</gates>
+<report>
+Reply with exactly this block and nothing before it, at most {{REPORT_LINES}} lines:
+STATUS: done | partial | blocked
+FILES: <every path you changed, comma-separated>
+F<n>: fixed — <test that proves it> | not fixed — <reason>        (one line per finding)
+GATE <command>: exit=<n> passed=<n> failed=<n>        (one line per gate)
+BLOCKED: none | <question> — blocks <what>
+Do not commit.
+</report>
