@@ -14,14 +14,20 @@
 //   "excerpts": [{ "file": "src/a.ts", "regex": "export function foo", "lines": 40 }],
 //   "conventions": { "source": "docs/conventions", "keywords": ["error", "zod"] },
 //   "checklist": { "source": "docs/conventions/review-checklist.md", "areas": ["Input", "Tests"] },
-//   "gatePrefix": "~/.claude/skills/agentic-maestro/scripts/gate.sh"
+//   "gatePrefix": "~/.claude/skills/agentic-maestro/scripts/gate.sh",
+//   "graph": { "explain": ["exportRows"], "paths": [["ExportHandler", "DbPool"]], "query": ["..."],
+//              "graph": "graphify-out/graph.json", "maxLines": 40, "allowStale": false }   // optional
 // }
 // Every {{KEY}} in the template must get a value; pass "" to leave one empty on purpose. Arrays are
 // joined one item per line. Computed keys (do not put them in "values"): RULES (templates/_rules.md),
-// EXCERPTS, CONVENTIONS, CHECKLIST_AREAS; GATE_COMMANDS gets each line prefixed with gatePrefix.
+// EXCERPTS, CONVENTIONS, CHECKLIST_AREAS, GRAPH; GATE_COMMANDS gets each line prefixed with gatePrefix.
+// GRAPH pastes graphify answers (explain / path / query over graph.json) as a <graph> block, so the
+// executor gets callers, imports and dependency paths without reading files. Without "graph" it is
+// empty. It fails closed: graphify missing, a cited file changed since the graph was built (unless allowStale),
+// an ambiguous name (graphify exit 3, candidates shown) or an unknown name (exit 4) stops the brief.
 // The checklist source defaults to the skill's references/checklist.md; areas are its "## " headings.
 // Exit: 0 written; 1 a value, excerpt, keyword or area is missing; 2 usage or unreadable input.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +69,7 @@ if (!existsSync(tplPath)) fail(2, `no such template: ${tplPath}`);
 let out = readFileSync(tplPath, 'utf8');
 
 const values = { ...(spec.values ?? {}) };
-const COMPUTED = ['RULES', 'EXCERPTS', 'CONVENTIONS', 'CHECKLIST_AREAS'];
+const COMPUTED = ['RULES', 'EXCERPTS', 'CONVENTIONS', 'CHECKLIST_AREAS', 'GRAPH'];
 for (const k of COMPUTED) if (k in values) fail(2, `${k} is computed; remove it from "values"`);
 const used = new Set([...out.matchAll(/\{\{([A-Z0-9_]+)\}\}/g)].map((m) => m[1]));
 const run = (cmd, argv) => {
@@ -121,6 +127,45 @@ if (used.has('CHECKLIST_AREAS')) {
     picked.push(s.join('\n'));
   }
   values.CHECKLIST_AREAS = picked.join('\n');
+}
+
+if (used.has('GRAPH')) {
+  const g = spec.graph;
+  if (!g) values.GRAPH = '';
+  else {
+    const graphPath = at(g.graph ?? 'graphify-out/graph.json');
+    if (!existsSync(graphPath)) fail(1, `no graph at ${graphPath}: build it with \`graphify update <repo>\` (references/graphify.md)`);
+    const bin = [process.env.GRAPHIFY_BIN, 'graphify', join(homedir(), '.local/bin/graphify')].filter(Boolean)
+      .find((b) => run(b, ['--version']).ok);
+    if (!bin) fail(1, 'graphify is not installed: `uv tool install graphifyy` (or drop "graph" from the spec)');
+    const built = statSync(graphPath).mtimeMs;
+    const max = g.maxLines ?? 40;
+    const asks = [
+      ...(g.explain ?? []).map((x) => ['explain', [x]]),
+      ...(g.paths ?? []).map(([a, b]) => ['path', [a, b]]),
+      ...(g.query ?? []).map((q) => ['query', [q]]),
+    ];
+    if (asks.length === 0) fail(1, '"graph" needs at least one of explain, paths or query');
+    const parts = [];
+    for (const [cmd, args] of asks) {
+      const r = run(bin, [cmd, ...args, '--graph', graphPath]);
+      if (!r.ok) {
+        const why = r.code === 3 ? 'ambiguous name; pick one of the candidates' : r.code === 4 ? 'no matching node' : `exit ${r.code}`;
+        fail(1, `graphify ${cmd} ${args.map((a) => JSON.stringify(a)).join(' ')}: ${why}\n${r.text.split('\n').slice(0, 15).join('\n')}`);
+      }
+      const lines = r.text.trimEnd().split('\n');
+      const body = lines.length > max ? [...lines.slice(0, max), `… (${lines.length - max} more lines; run the command for all)`] : lines;
+      parts.push(`$ graphify ${cmd} ${args.map((a) => JSON.stringify(a)).join(' ')}\n${body.join('\n')}`);
+    }
+    // Stale only where it matters: a file the answers cite that changed after the graph was built.
+    // (Rebuilding a large graph takes minutes, so an older graph whose cited files are unchanged is fine.)
+    const cited = new Set([...parts.join('\n').matchAll(/([\w./@+-]+\.[A-Za-z0-9]+):L\d+/g)].map((m) => m[1]));
+    const changed = [...cited].filter((f) => { const abs = at(f); return existsSync(abs) && statSync(abs).mtimeMs > built; });
+    if (changed.length && !g.allowStale) {
+      fail(1, `graph is stale for files these answers cite (changed after ${new Date(built).toISOString()}): ${changed.join(', ')}\nrerun \`graphify update ${root}\` or set "allowStale": true`);
+    }
+    values.GRAPH = `<graph>\nAnswers from the code graph (${graphPath}). For any other "who calls / what imports / how does A reach B" question, run \`graphify explain|path|query ... --graph ${graphPath}\` before grepping or opening files.\n\n${parts.join('\n\n')}\n</graph>`;
+  }
 }
 
 if ('GATE_COMMANDS' in values && spec.gatePrefix) {

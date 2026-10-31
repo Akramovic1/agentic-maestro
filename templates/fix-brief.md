@@ -19,6 +19,7 @@ Previous rulings that still apply: {{PRIOR_RULINGS}}
 Invariants that must keep holding (each still tested): {{INVARIANTS}}
 </still-applies>
 <map>Files you may change (nothing else): {{FILES}}</map>
+{{GRAPH}}
 <gates>
 Exact commands, per-package only (tests, typecheck, lint of the packages you change), one at a time, once at the end:
 {{GATE_COMMANDS}}

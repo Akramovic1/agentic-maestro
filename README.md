@@ -199,6 +199,7 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 | [`references/harnesses.md`](references/harnesses.md) | Spawn calls per harness (Agent tool, `claude -p`, `codex exec`, `opencode run`), resume, permissions, pitfalls |
 | [`references/checklist.md`](references/checklist.md) | Default pre-review checklist and how a project grows its own |
 | [`references/operations.md`](references/operations.md) | Concurrency, lane ownership, git, reviewer prompts, context hygiene, cost ledger |
+| [`references/graphify.md`](references/graphify.md) | Optional code graph ([graphify](https://github.com/Graphify-Labs/graphify)): callers, imports and paths pasted into briefs instead of reading files |
 | [`templates/`](templates/) | Build, fix and integration briefs; the shared rules block; a Claude Code agent definition; an example spec |
 | [`scripts/brief.mjs`](scripts/brief.mjs) | Assembles a brief from a JSON spec; fails closed on any gap |
 | [`scripts/spawn.mjs`](scripts/spawn.mjs) | Runs one headless agent on `claude`, `codex` or `opencode`; writes `result.json` and a ledger row |

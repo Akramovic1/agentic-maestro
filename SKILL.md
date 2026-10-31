@@ -15,7 +15,8 @@ intelligence changes the cost, not the safeguard.
 Files: `templates/` (brief, fix-brief, integration-brief, the shared `_rules.md`, a Claude Code agent
 definition, an example brief spec), `scripts/` (below), `references/harnesses.md` (spawn calls per
 harness), `references/checklist.md` (pre-review checklist and how it grows), `references/operations.md`
-(concurrency, lanes, git, reviewer prompts, context, cost ledger).
+(concurrency, lanes, git, reviewer prompts, context, cost ledger), `references/graphify.md` (an optional
+code graph that answers callers, imports and paths without reading files).
 
 | Script | Does |
 |---|---|
@@ -24,6 +25,7 @@ harness), `references/checklist.md` (pre-review checklist and how it grows), `re
 | `scripts/scope-check.sh <worktree> <base> <allowed>...` | Lists changed files outside the brief's map |
 | `scripts/excerpt.sh`, `scripts/conv.sh` | A pattern excerpt; the matching convention bullets, verbatim |
 | `scripts/codemap.mjs <repo> [groups] \| --generic` | Generates `docs/CODEMAP.md` (JS/TS workspaces, or any git repo) |
+| `graphify update <repo>` (optional, `uv tool install graphifyy`) | Builds a local code graph; `brief.mjs` pastes its `explain` / `path` answers into briefs |
 | `scripts/gate.sh <cmd>` | Machine-wide lock: at most N heavy checks at once |
 
 ## 0. Spawn or do it yourself
@@ -33,7 +35,8 @@ holds: the change is one file or under ~50 changed lines; writing the brief woul
 change; it is a one-line fix to a review finding; the task needs judgement the brief cannot pin down.
 Spawn when the work is self-contained behind exact rulings, touches several files or packages, or can
 run in parallel with other lanes. For facts you need to WRITE a brief (where is the pattern, who calls
-X), a cheap read-only scout that returns paths and facts — not file dumps — is fine; design stays here.
+X), ask the code graph first (`graphify explain|path|query`, `references/graphify.md`); otherwise a cheap
+read-only scout that returns paths and facts — not file dumps — is fine; design stays here.
 
 ## Part A — Writing a brief
 
@@ -57,7 +60,8 @@ X), a cheap read-only scout that returns paths and facts — not file dumps — 
    parsing. Anything that parses, validates or gates is FAIL-CLOSED.
 7. **Done means**: the exact assertions the tests must prove.
 8. **Map**: the only files it may create or change, ONE existing feature as the pattern, and the
-   `docs/CODEMAP.md` sections to read.
+   `docs/CODEMAP.md` sections to read. On a large repo add a **graph** block (`"graph"` in the spec):
+   graphify's answers about the symbols it touches, so it never explores to find callers or paths.
 9. **Excerpts**: usually ~2 key functions of the pattern (`excerpt.sh`).
 10. **Gates**: exact per-package commands, wrapped by `gate.sh` when lanes run in parallel.
 11. **Report**: the fixed block (STATUS / FILES / one line per ruling / one line per gate / CHECKLIST /
@@ -85,7 +89,8 @@ guideline for context cost, not a limit.
 
 ## Part B — Running the pipeline
 
-1. **Plan**: resolve every ambiguity as explicit rulings before any build. Split the work into lanes,
+1. **Plan**: resolve every ambiguity as explicit rulings before any build. On a large repo rebuild the
+   code graph first in the background (`graphify update <repo>`; a brief refuses answers whose cited files changed since). Split the work into lanes,
    each with the files it owns; give shared hotspots (barrels, lockfiles, migration numbers, generated
    files) to one lane or to integration, and pick each lane's executor by risk (below).
 2. **Spawn**: one executor per lane with its brief, in its own worktree, as a tracked background job

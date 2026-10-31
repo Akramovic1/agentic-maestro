@@ -31,6 +31,7 @@ Files you may create or change (nothing else): {{FILES}}
 Pattern to copy: {{PATTERN}} (excerpts below)
 Code map: read only these sections of {{CODEMAP_PATH}}: {{CODEMAP_SECTIONS}}
 </map>
+{{GRAPH}}
 <excerpts>
 {{EXCERPTS}}
 </excerpts>
