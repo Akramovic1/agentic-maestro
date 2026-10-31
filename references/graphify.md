@@ -33,9 +33,10 @@ graphify update /path/to/repo      # code-only, no LLM; writes /path/to/repo/gra
 - Build once per planning round, not per brief. On a large repo a build takes minutes (measured: about
   13 minutes for 702 files / 7,600 nodes on a laptop, and a rebuild after one edit was no faster,
   because linking symbols across files dominates). Run it in the background while you plan.
-- `brief.mjs` refuses only a graph that is stale **for the files its answers cite**: if any of them
-  changed after the graph was built, the brief names them and stops. An older graph whose cited files
-  are unchanged is used as is.
+- `brief.mjs` refuses only a graph that is stale **for the files its answers cite**: it compares each
+  cited file's contents with the hash in graphify's `manifest.json`, so a checkout or pull that only
+  refreshes timestamps does not count. If a cited file's contents changed (or it was deleted), the
+  brief names it and stops; an older graph whose cited files are unchanged is used as is.
 - Worktrees: build once in the main checkout and point every brief at that `graph.json` (the spec's
   `"graph": {"graph": "/abs/path/graphify-out/graph.json"}`), so executors do not rebuild.
 - Executors only run read-only queries (`explain`, `path`, `query`); they never run `update`.
@@ -57,6 +58,13 @@ ranges spends less, so treat this as an upper bound on the saving, not a typical
 
 Exit codes: `0` an answer, `3` an ambiguous name (candidates are listed: use the full id), `4` no
 matching node. `brief.mjs` turns 3 and 4 into a refused brief, never a silent gap.
+
+## Verified with an executor
+
+On the same repo a Codex executor (low effort, read-only) got a brief with a `<graph>` block plus a
+question the brief did not answer. It ran `graphify explain` first, met an ambiguous name (exit 3, two
+files define `getAuthConfig`), re-ran with the full ids from the candidate list, and used `rg` only on
+the files the graph named to confirm line numbers: 31 s, no open-ended reading.
 
 ## In a brief spec
 

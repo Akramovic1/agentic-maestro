@@ -31,6 +31,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'no
 import { resolve, dirname, join, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 
 const SKILL = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -160,7 +161,17 @@ if (used.has('GRAPH')) {
     // Stale only where it matters: a file the answers cite that changed after the graph was built.
     // (Rebuilding a large graph takes minutes, so an older graph whose cited files are unchanged is fine.)
     const cited = new Set([...parts.join('\n').matchAll(/([\w./@+-]+\.[A-Za-z0-9]+):L\d+/g)].map((m) => m[1]));
-    const changed = [...cited].filter((f) => { const abs = at(f); return existsSync(abs) && statSync(abs).mtimeMs > built; });
+    // Compare contents with graphify's manifest (ast_hash = md5 of the file) so a checkout or pull that
+    // only refreshes timestamps is not "changed"; fall back to mtime for files without a hash.
+    let manifest = {};
+    try { manifest = JSON.parse(readFileSync(join(dirname(graphPath), 'manifest.json'), 'utf8')); } catch { /* no manifest */ }
+    const changed = [...cited].filter((f) => {
+      const abs = at(f);
+      if (!existsSync(abs)) return true; // a cited file that no longer exists is stale too
+      const h = manifest[f]?.ast_hash;
+      if (h) return createHash('md5').update(readFileSync(abs)).digest('hex') !== h;
+      return statSync(abs).mtimeMs > built;
+    });
     if (changed.length && !g.allowStale) {
       fail(1, `graph is stale for files these answers cite (changed after ${new Date(built).toISOString()}): ${changed.join(', ')}\nrerun \`graphify update ${root}\` or set "allowStale": true`);
     }
