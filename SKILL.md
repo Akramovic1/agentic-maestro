@@ -32,7 +32,11 @@ Terms used to choose a mode:
 
 1. Run `node <skill>/scripts/mode.mjs list`. It prints the modes in effect — the project's
    `maestro.modes.json`, else the user's file, else the built-in one — with each mode's `when`, cost
-   and model lineup.
+   and model lineup. If it refuses because the project's modes file is **not trusted**, stop: that
+   file came with the repository, and it decides which models run and what you would be told to do.
+   Tell the user, say what it changes compared with the built-in file, and let the user run
+   `mode.mjs trust`. Never run `trust` yourself, and do not go around the refusal with `--file`
+   unless the user says to.
 2. Choose:
    - The user named a mode or its meaning ("economy", "use the cheap models", "do it direct", "red
      team this"): that mode.
@@ -47,16 +51,19 @@ Terms used to choose a mode:
      against several — ask ONE question listing only those candidates with their `when` lines, the
      file's `default` first when it is among them. Never guess between budgets.
    - Trivial work — docs, copy, a local rename — needs no mode: do it, check it, say so.
-3. Run `node <skill>/scripts/mode.mjs show <mode>`. Tell the user the mode and its lineup in one line
+3. Run `node <skill>/scripts/mode.mjs show <mode> --session-family <family>` (step 4 says which
+   family). Tell the user the mode and its lineup in one line
    (`role=model` pairs, as `list` prints them), read the files it lists under "read first", put its
    tasks on the task list in order, and follow its rules. Other files in `references/` are read when a
    task names them. When the mode lists `skills`, load the ones that are installed, for the target at
    hand, at the task that needs them, and name the missing ones in one line; never install one unasked.
-4. The maestro is whatever model this session runs on. If the mode names a different one, say so in
-   one line and continue: only the user can change the session's model. Independence is judged on the
-   models actually running: when this session's model is from the same family as the mode's reviewer
-   and the maestro writes the code, use a reviewer from another family (ask which, if the mode lists
-   none).
+4. The maestro is the model this session runs on, whichever it is: the built-in modes say
+   `maestro: session`, so any model can conduct. Pass your own model's vendor family to the script on
+   every call — `--session-family anthropic` for a Claude model, `openai` for GPT and Codex, and so
+   on, using the `family` names in the modes file. Where the maestro writes the code, the script then
+   leaves out a reviewer from that same family and refuses a mode that has no other. A mode that pins
+   its maestro to one model says what it was designed around: if this session runs on another, say
+   so in one line and continue.
 5. Match the security effort to the work. Ordinary code gets the review its build mode gives and no
    security pass: do not over-secure it.
    - Code that moves money or value, grants authority, handles keys or secrets, or is a smart

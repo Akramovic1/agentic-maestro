@@ -56,7 +56,7 @@
         "references/verification.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "reviewer": [
           "codex",
           "glm"
@@ -81,7 +81,7 @@
       ]
     },
     "frontier": {
-      "title": "Frontier: a strong maestro conducts strong coders",
+      "title": "Frontier: the session's model conducts strong coders",
       "when": "Ordinary code, plenty of strong-model tokens, and work that splits into lanes.",
       "cost": "Highest total tokens; best quality per lane and the most parallelism.",
       "pipeline": "delegate",
@@ -91,7 +91,7 @@
         "references/operations.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "executor": "opus",
         "reviewer": "codex",
         "scout": "sonnet"
@@ -126,7 +126,7 @@
         "references/verification.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "executor": "opus",
         "reviewer": "codex",
         "redteam": [
@@ -157,7 +157,7 @@
       ]
     },
     "economy": {
-      "title": "Economy: a strong maestro conducts cheap coders",
+      "title": "Economy: the session's model conducts cheap coders",
       "when": "Saving strong-model tokens: many similar features, plumbing, schemas, CRUD, UI, mechanical refactors behind exact rulings.",
       "cost": "Lowest strong-model tokens per feature; more wall-clock and more fix rounds.",
       "pipeline": "delegate",
@@ -168,7 +168,7 @@
         "references/checklist.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "executor": "deepseek",
         "executorStrong": "opus",
         "reviewer": "codex",
@@ -194,7 +194,7 @@
     },
     "reserve": {
       "title": "Reserve: no strong-model credits left",
-      "when": "The model you normally conduct with is out of credits. Run the skill from Codex or OpenCode; the best model still available conducts and cheap models code.",
+      "when": "The model you normally conduct with is out of credits. Run the skill from Codex or OpenCode on the best model still available; cheap models code.",
       "cost": "No strong-model tokens. Slower, with smaller lanes and a review on everything.",
       "pipeline": "delegate",
       "read": [
@@ -204,7 +204,7 @@
         "references/checklist.md"
       ],
       "roles": {
-        "maestro": "codex",
+        "maestro": "session",
         "executor": "deepseek",
         "reviewer": "glm",
         "scout": "deepseek-flash"
@@ -236,7 +236,7 @@
         "references/redteam.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "redteam": [
           "codex",
           "glm"
@@ -270,7 +270,7 @@
         "references/verification.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "redteam": [
           "codex",
           "glm"
@@ -336,9 +336,12 @@
         "references/checklist.md"
       ],
       "roles": {
-        "maestro": "fable",
+        "maestro": "session",
         "executor": "deepseek",
-        "reviewer": "codex"
+        "reviewer": [
+          "codex",
+          "glm"
+        ]
       },
       "tasks": [
         "Collect categories: the ledger's findings column, the project checklist, recent review reports, corrections the user has repeated",

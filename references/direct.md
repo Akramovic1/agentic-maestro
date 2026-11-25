@@ -109,11 +109,14 @@ with file:line, then a verdict: PASS / PASS-WITH-FOLLOWUP / NEEDS FIXES. The mod
 mode, run from the project directory:
 
 ```bash
-node <skill>/scripts/spawn.mjs $(node <skill>/scripts/mode.mjs args direct reviewer --index 1) \
+node <skill>/scripts/spawn.mjs $(node <skill>/scripts/mode.mjs args direct reviewer --session-family <family>) \
   --brief .agent-briefs/<id>-review-r1.md --dir . --out .agent-runs/<id>-review-r1
 ```
 
-A panel is the same prompt sent to each reviewer in parallel (`--index 2`, ...). Arbitrate the union
+`<family>` is your own model's family (`SKILL.md` §0.4): you wrote this code, so the script gives you
+the first reviewer from a different family and refuses one from your own. A panel is the same prompt
+sent to each independent reviewer in parallel (`--index 1`, `--index 2`, ...; a reviewer from your
+own family is refused). Arbitrate the union
 of findings; the same finding from two reviewers counts once. A re-review resumes that reviewer's own
 session id (`--resume <id>`).
 

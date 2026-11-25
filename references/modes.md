@@ -10,8 +10,8 @@ The first that exists wins. Files are never merged, so the one in effect is the 
 
 1. `--file <path>` on the command
 2. `$MAESTRO_MODES`
-3. `maestro.modes.json` in the current directory or a parent, up to the repository root (commit it to
-   share a team's modes)
+3. `maestro.modes.json` in the current directory or a parent, inside the current git repository only
+   (commit it to share a team's modes). It is used only once the user has trusted it — see below
 4. `~/.config/agentic-maestro/modes.json` (your own lineups, for every project)
 5. the skill's `templates/modes.json`
 
@@ -20,7 +20,18 @@ node scripts/mode.mjs path                 # which file, and why
 node scripts/mode.mjs init --user          # copy the built-in file to ~/.config/agentic-maestro/ to edit
 node scripts/mode.mjs init --project       # or to ./maestro.modes.json
 node scripts/mode.mjs check                # validate after every edit
+node scripts/mode.mjs trust                # accept the project file as it is now
 ```
+
+### A project file has to be trusted
+
+A `maestro.modes.json` arrives with the repository, so it may be somebody else's text. It decides which
+models run and which tasks, rules and skills the agent follows; a hostile one is a way to steer the
+agent. So `mode.mjs` uses a project file only when its SHA-256 is recorded in
+`~/.config/agentic-maestro/trusted.json`. A new or changed project file makes every command refuse
+(exit 1) instead of quietly falling back to another file. Read the file, then run `mode.mjs trust`.
+`init --project` trusts the copy it writes; after you edit it, trust it again. The agent is told never
+to run `trust` for you. A file outside a git repository, or above the repository root, is never used.
 
 ## Models
 
@@ -65,8 +76,13 @@ In `direct` the first reviewer handles ordinary work and the whole list is the p
 work.
 `mode.mjs args` adds `--mode read-only` for the read-only roles.
 
-The maestro entry records which model the mode is designed around. The skill cannot switch the
-session's model; when they differ it says so and carries on. On Claude Code a role whose harness is
+The maestro is normally `"session"`: whatever model the session runs on, so the same mode works
+whether you start it on Fable, Opus, GPT or a cheaper model. `session` is not defined under `models`
+and only the maestro can use it. Because the file cannot know that model's family, the agent passes
+it: `--session-family anthropic`. In a mode where the maestro writes the code (`direct`, `harden`)
+the script then skips a reviewer from the same family, and refuses if nobody else is listed — which
+is why those modes list reviewers from two families. A mode may still pin its maestro to one alias;
+the skill cannot switch the session's model, so when they differ it says so and carries on. On Claude Code a role whose harness is
 `claude` can also run in-process through the Agent tool, passing the alias's `model`
 (`harnesses.md`).
 
@@ -79,7 +95,7 @@ session's model; when they differ it says so and carries on. On Claude Code a ro
   "cost": "Lowest strong-model tokens per feature; more wall-clock and more fix rounds.",
   "pipeline": "delegate",
   "read": ["references/delegate.md", "references/harnesses.md"],
-  "roles": { "maestro": "fable", "executor": "deepseek", "executorStrong": "opus", "reviewer": "codex" },
+  "roles": { "maestro": "session", "executor": "deepseek", "executorStrong": "opus", "reviewer": "codex" },
   "tasks": ["Plan: ...", "Brief each lane ...", "..."],
   "rules": ["Route by risk: ..."]
 }
@@ -106,8 +122,9 @@ session's model; when they differ it says so and carries on. On Claude Code a ro
 | You want | Change |
 |---|---|
 | Fable conducts, Opus codes | That is `frontier`. Run the session on Fable and say "frontier". |
+| Another model conducts | Nothing to edit: start the session on that model. The maestro is the session's model in every built-in mode. |
 | A different cheap coder | Point `models.deepseek.model` at another id, or add an alias and use it in `economy.roles.executor`. |
-| Claude credits are gone | Start the session in Codex or OpenCode and say "reserve". Edit `reserve.roles.maestro` to whatever conducts there. |
+| Claude credits are gone | Start the session in Codex or OpenCode and say "reserve". Whatever model that session runs on conducts. |
 | A second red-team reviewer | Add its alias to `redteam.roles.redteam`. Different families find different things. |
 | Another chain or stack in audits | Add a target under `audit.skills` (for example `"solana"`) with the skills for it, and say the target when you start the audit. |
 | Normal code versus important code | `frontier` for normal code, `critical` for important APIs and contracts, `audit` before a first deployment. |
