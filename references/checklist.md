@@ -11,8 +11,11 @@ point the spec's `"checklist": {"source": ...}` at it.
 How it grows (the arbitration step does this, every round):
 - Tag every AGREED review finding with one category (for example `input/clamp`, `storage/unpinned-read`,
   `tests/fake-negative`).
-- When a category recurs in a second feature, add one rule for it to the project checklist: the
+- When a category recurs in a second feature, promote it (`hardening.md`). First choice is a check that
+  runs in the gates — a type, a lint rule, a test — because it costs no brief context and cannot be
+  skipped. Add a rule to the project checklist only when the category needs judgement, and write the
   general rule, not the instance ("refuse, never clamp", not "refuse page sizes over 100").
+- When a checklist rule becomes a check, delete the rule.
 - When a rule has not prevented anything for many features, or reviewers never hit its area, drop it:
   every line costs context in every brief that carries the area.
 

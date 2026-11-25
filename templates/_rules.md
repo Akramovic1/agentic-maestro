@@ -5,5 +5,6 @@ Working rules (binding; identical for every executor, so keep this block first a
 - Looping: if the same error repeats 3 times, or one command waits more than 10 minutes, stop and report instead of retrying.
 - Scope: stay inside your working directory and touch only the files in your map; a change needed anywhere else is a blocked question.
 - Tests are evidence: never weaken, skip, exempt or delete an existing test; if one must change, say why in the report.
+- Comments: never write a comment that justifies a workaround, a skipped rule or a temporary shortcut, and never disable a lint rule or check; either one is a blocked question. Comment only what the code cannot say (a non-obvious invariant, a spec reference).
 - Safety: never read secrets, env or credential files; never make paid or subscription calls; never run commands marked user-only.
 - Decisions: anything the brief does not decide is a blocked question, never a guess. Finish everything the question does not block, then report it.

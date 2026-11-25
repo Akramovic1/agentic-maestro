@@ -8,6 +8,10 @@ The pipeline is the same on every harness; only the spawn call differs. Two ways
   orchestrator, any mix of vendors, and every run leaves a run directory (`command.txt`,
   `events.jsonl`, `stderr.log`, `final.md`, `result.json`) plus an optional ledger row.
 
+Commands below are run from the project directory; `scripts/...` means `<skill>/scripts/...`. Take
+`--harness`, `--model` and `--effort` from the mode (`mode.mjs args <mode> <role>`); the literal
+models in the examples only show the shape.
+
 Rules for every harness:
 - Write the brief to a file first (`.agent-briefs/<feature>-<role>-r<round>.md`, git-ignored) and send
   it on stdin, or as "Read and follow <path> exactly" for the Agent tool. The file is the audit trail
@@ -118,6 +122,6 @@ message. Add it as one more branch in `scripts/spawn.mjs` and one section here.
 |---|---|---|
 | Orchestrator | Strongest model you have (Claude Code Opus, Codex top model) | Holds the context; every ruling comes from here |
 | Plumbing executor (schemas, CRUD, UI, refactors) | Cheapest capable model on any harness | The brief carries the judgement |
-| High-risk executor (security, untrusted parsers, money, determinism, cross-system e2e) | Strong model from the start | Rounds of fixes cost more than the stronger model |
+| High-risk executor (high-risk work as `SKILL.md` defines it, plus anything that must be deterministic) | Strong model from the start | Rounds of fixes cost more than the stronger model |
 | Reviewer | A different vendor or model family from the executor | Independent errors; same-model review misses the same things |
 | Scout (find a pattern, list callers) | Cheapest model, read-only | Returns facts and paths, not file dumps |

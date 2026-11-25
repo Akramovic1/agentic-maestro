@@ -1,25 +1,155 @@
 ---
 name: agentic-maestro
-description: "Delegate coding work to sub-agents efficiently with a strong orchestrator and cheaper executors: when to spawn, how to write a precise brief, how to spawn on Claude Code (Agent tool or claude -p), Codex (codex exec) or OpenCode (opencode run), and how to run build -> review -> fix -> merge with an independent reviewer. Use when spawning or delegating implementation, fixes, integration, reviews or parallel agents, when writing an executor brief, or when running a multi-agent build pipeline."
+description: "Build high-quality code in the working mode that fits the session: direct (the strong model writes the code itself), frontier (a strong model conducts strong coders), critical (strong coders plus mandatory red-team passes, for important APIs and smart contracts), economy (a strong model conducts cheap coders such as DeepSeek or GLM), reserve (no strong-model credits left), redteam (security check of a plan or commit), audit (full security review of a contract system or critical API) and harden (turn recurring findings into lint rules, types and tests). Each mode has its own model lineup and task list in an editable modes file, and runs on Claude Code, Codex or OpenCode. Use when implementing a feature, fixing a bug or refactoring where quality matters, when choosing which models do the work, when spawning or delegating to sub-agents, when writing an executor brief, when running a build, review, fix and merge pipeline, or when a security review or smart-contract audit is asked for."
 license: MIT
 compatibility: Claude Code, Codex, OpenCode (any Agent Skills host); Node.js 18+ and bash for the scripts
 ---
 
 # agentic-maestro
 
-The strong model is the **maestro**: it holds all the context, makes every design decision and writes
-precise parts. Cheaper models are the **players**: each executes one part exactly, without the whole
-score. Precise briefs plus an independent review are the safeguard, not a guarantee; the executor's
-intelligence changes the cost, not the safeguard.
+The model running this session is the **maestro**. A **mode** says how a piece is performed: who
+writes the code, who reviews it, and which tasks run in which order. Modes exist because sessions
+differ — some days strong-model tokens are plentiful, some days they are gone, some work is a security
+check and not a build. Every mode stands on the same floor (§1): precise rulings plus an independent
+review are the safeguard, not a guarantee; who writes the code changes the cost, not the safeguard.
 
-Files: `templates/` (brief, fix-brief, integration-brief, the shared `_rules.md`, a Claude Code agent
-definition, an example brief spec), `scripts/` (below), `references/harnesses.md` (spawn calls per
-harness), `references/checklist.md` (pre-review checklist and how it grows), `references/operations.md`
-(concurrency, lanes, git, reviewer prompts, context, cost ledger), `references/graphify.md` (an optional
-code graph that answers callers, imports and paths without reading files).
+`<skill>` is this skill's directory; a path written as `scripts/...`, `references/...` or
+`templates/...` in any file of the skill is relative to it. The maestro is called the orchestrator in
+the brief templates and in `references/delegate.md`: the same role.
+
+Terms used to choose a mode:
+- **Lane**: a piece of the work with its own set of files that can be built and pass its gates without
+  the other pieces.
+- **Strong model**: the best model the user can run right now. When its credits are gone, the next
+  best one conducts (`reserve`).
+- **Build mode**: a mode that changes code — `direct`, `frontier`, `critical`, `economy`, `reserve`,
+  `harden`.
+- **High-risk work**: security rules, parsers of untrusted input, money, persistence and migrations,
+  concurrency, public interfaces and stored formats, cross-system flows. Every file of the skill that
+  says "high-risk" means this list.
+
+## 0. Pick the mode, every session
+
+1. Run `node <skill>/scripts/mode.mjs list`. It prints the modes in effect — the project's
+   `maestro.modes.json`, else the user's file, else the built-in one — with each mode's `when`, cost
+   and model lineup.
+2. Choose:
+   - The user named a mode or its meaning ("economy", "use the cheap models", "do it direct", "red
+     team this"): that mode.
+   - A mode was chosen earlier in this session: keep it until the user changes it. When the work
+     changes kind (a security check is `redteam`, a full security review is `audit`, findings that keep
+     returning are `harden`), propose the switch in one line and make it when the user agrees.
+   - Otherwise list the modes whose `when` fits; read enough of the repository to count the lanes
+     when the request does not settle it. One candidate: take it. None: take the file's `default`.
+     Several that differ only in depth (`redteam` against `audit`): the lighter one for a single
+     change, the deeper one for a whole component or a deployment; say which and why. Several that
+     differ in who writes the code or in budget — strong coders against cheap ones, one writer
+     against several — ask ONE question listing only those candidates with their `when` lines, the
+     file's `default` first when it is among them. Never guess between budgets.
+   - Trivial work — docs, copy, a local rename — needs no mode: do it, check it, say so.
+3. Run `node <skill>/scripts/mode.mjs show <mode>`. Tell the user the mode and its lineup in one line
+   (`role=model` pairs, as `list` prints them), read the files it lists under "read first", put its
+   tasks on the task list in order, and follow its rules. Other files in `references/` are read when a
+   task names them. When the mode lists `skills`, load the ones that are installed, for the target at
+   hand, at the task that needs them, and name the missing ones in one line; never install one unasked.
+4. The maestro is whatever model this session runs on. If the mode names a different one, say so in
+   one line and continue: only the user can change the session's model. Independence is judged on the
+   models actually running: when this session's model is from the same family as the mode's reviewer
+   and the maestro writes the code, use a reviewer from another family (ask which, if the mode lists
+   none).
+5. Match the security effort to the work. Ordinary code gets the review its build mode gives and no
+   security pass: do not over-secure it.
+   - Code that moves money or value, grants authority, handles keys or secrets, or is a smart
+     contract is built in `critical`. So is anything the user calls critical.
+   - Other high-risk work (a migration, a new public endpoint, concurrency) stays in its build mode,
+     takes the higher review tier there, and ends with a proposed `redteam` pass on the integrated
+     commit.
+   - Before a first deployment or release of a contract system, or of an API that moves money or
+     grants authority, and after a large change to its value-moving or authority logic, propose
+     `audit`.
+   A proposal waits for the user's yes. A request that already is the check ("audit this", "check
+   the contracts before mainnet") is the chosen mode, not a proposal.
+
+Built-in modes (the modes file is the authority; this table is a summary):
+
+| Mode | Who writes the code | For |
+|---|---|---|
+| `direct` | The maestro itself | Plenty of strong-model tokens, one lane, or work that needs judgement |
+| `frontier` | Strong coders, conducted by the maestro | Ordinary code with plenty of tokens and several lanes; keeps the maestro's context for design and review |
+| `critical` | Strong coders only | High-risk code: important APIs, smart contracts. Red team on the plan and on the commit, property tests required |
+| `economy` | Cheap coders, conducted by a strong maestro | Saving strong-model tokens on work that sits behind exact rulings |
+| `reserve` | Cheap coders, conducted by the best model still available | Strong-model credits are used up; run from Codex or OpenCode |
+| `redteam` | Nobody (read-only) | A security check of one plan or one commit by independent reviewers |
+| `audit` | Nobody (tests in a scratch copy) | A full security review of a contract system or a critical API: analyzers, panel, property tests, a proof per finding, a report |
+| `harden` | The maestro, cheap coders for cleanup | Turning recurring findings into lint rules, types and tests |
+
+One piece of work can use more than one: `direct` for a hard core, `economy` for the lanes around it,
+`redteam` on the integrated commit. A change that is one file and under ~50 changed lines is done
+inline by the maestro in any build mode except `critical`. Inline skips the brief and the spawn; it
+does not skip the proof, the review its risk calls for, or the report.
+
+To change a lineup or a mode's tasks: `node <skill>/scripts/mode.mjs init --user` (or `--project`),
+edit the file, then `mode.mjs check`. Format and examples: `references/modes.md`. Spawn calls take
+their model from the mode, never from memory:
+`node <skill>/scripts/spawn.mjs $(node <skill>/scripts/mode.mjs args <mode> <role>) --brief ... --dir ... --out ...`.
+
+## 1. The floor (every mode)
+
+1. **Rulings before code.** Resolve every ambiguity as an explicit ruling. Anything that parses,
+   validates or gates is FAIL-CLOSED.
+2. **Tests are evidence.** "Done" is a list of exact assertions written before the code; an existing
+   test is never weakened, skipped or deleted to get a pass.
+3. **Prove it on the real artifact.** Gates are judged by exit code, and anything that can run is run
+   and leaves evidence (`references/verification.md`).
+4. **Independent review** by a different model family from the one that wrote the code, for anything
+   above trivial; every finding arbitrated — AGREE with an exact fix ruling, or DISAGREE / DEFER with
+   a reason, never forwarded raw — and the approval tied to one commit SHA.
+5. **Every correction becomes structure.** A correction from the user, the reviewer or your own second
+   attempt is promoted to a type, a lint rule or a test before it becomes prose
+   (`references/hardening.md`).
+6. **Authority.** Commit, merge and push follow the user's and the project's rules. Reversible choices
+   inside the goal are ruled on and reported. Asked first, never assumed: irreversible or
+   outward-facing actions, a change to a public interface or stored format, anything touching policy,
+   money or identity that no ruling covers, and scope beyond the stated goal.
+
+## 2. The three pipelines
+
+A mode's `pipeline` says who writes the code and which roles the mode needs; its `read` list names
+the playbook that explains its tasks.
+
+- **direct** (`references/direct.md`): the maestro writes the code. Goal, baseline, reproduce or
+  specify, shape, build in verified units, prove on the real artifact, self-review, independent
+  review scaled by risk, harden, report. Playbooks for bug fix, feature, refactor, performance and
+  investigation.
+- **delegate** (`references/delegate.md`): the maestro plans and rules; executors implement precise
+  briefs in their own worktrees; an independent reviewer checks every commit; fixes go to a fresh
+  executor; small batches merge. `references/harnesses.md` has the spawn call for each agent CLI,
+  `references/operations.md` the concurrency, git and ledger rules.
+- **review** (`references/redteam.md`, `references/audit.md`): read-only reviewers challenge a plan,
+  a commit or a whole component; the maestro arbitrates and proves each finding; fixes are built in
+  a build mode.
+
+## Files
+
+| Path | Read it when |
+|---|---|
+| `references/modes.md` | Editing the modes file, adding a mode, changing a model |
+| `references/direct.md` | The `direct` mode starts, or any mode that lists it |
+| `references/delegate.md` | A mode that briefs executors starts: writing briefs, running build -> review -> fix -> merge |
+| `references/redteam.md` | A security check of a plan or a commit starts |
+| `references/audit.md` | A full security review of a component starts |
+| `references/hardening.md` | A finding or correction is being promoted to a check |
+| `references/verification.md` | Proving work on the real artifact: runtime evidence, feature map, driver, property and formal checks |
+| `references/harnesses.md` | Spawning on Claude Code, Codex or OpenCode |
+| `references/operations.md` | Several executors on one machine: lanes, git, reviewer prompts, cost ledger |
+| `references/checklist.md` | Choosing checklist areas for a brief; adding a rule that needs judgement |
+| `references/graphify.md` | Optional code graph for callers, imports and paths on a large repo |
+| `templates/` | `modes.json` (built-in modes), brief, fix-brief, integration-brief, the shared `_rules.md`, a Claude Code agent definition, an example brief spec |
 
 | Script | Does |
 |---|---|
+| `scripts/mode.mjs list \| show <mode> \| args <mode> <role> [--index n] \| check \| path \| init` | Prints and validates modes; `args` gives the launcher arguments for a role (`--index` picks one of a panel). Refuses an unknown key, role or model, and a reviewer from the coder's own family |
+| `scripts/toolcheck.sh contracts\|api\|all` | Lists which analyzers are installed, so a report says "not covered" for a missing one |
 | `scripts/brief.mjs <spec.json> --out <file>` | Assembles a brief from a JSON spec; refuses missing values, excerpts or keywords |
 | `scripts/spawn.mjs --harness claude\|codex\|opencode ...` | Runs one headless agent; writes `result.json` (session id, exit, tokens) and a ledger row |
 | `scripts/scope-check.sh <worktree> <base> <allowed>...` | Lists changed files outside the brief's map |
@@ -27,115 +157,3 @@ code graph that answers callers, imports and paths without reading files).
 | `scripts/codemap.mjs <repo> [groups] \| --generic` | Generates `docs/CODEMAP.md` (JS/TS workspaces, or any git repo) |
 | `graphify update <repo>` (optional, `uv tool install graphifyy`) | Builds a local code graph; `brief.mjs` pastes its `explain` / `path` answers into briefs |
 | `scripts/gate.sh <cmd>` | Machine-wide lock: at most N heavy checks at once |
-
-## 0. Spawn or do it yourself
-
-A spawn costs a brief (~5–12 KB of orchestrator output), a review and a commit. Do it inline when ANY
-holds: the change is one file or under ~50 changed lines; writing the brief would take longer than the
-change; it is a one-line fix to a review finding; the task needs judgement the brief cannot pin down.
-Spawn when the work is self-contained behind exact rulings, touches several files or packages, or can
-run in parallel with other lanes. For facts you need to WRITE a brief (where is the pattern, who calls
-X), ask the code graph first (`graphify explain|path|query`, `references/graphify.md`); otherwise a cheap
-read-only scout that returns paths and facts — not file dumps — is fine; design stays here.
-
-## Part A — Writing a brief
-
-### Roles
-- The orchestrator specifies **observable** behaviour exactly: interfaces, limits, error codes and the
-  critical invariants. It never writes "decide how to…".
-- Routine implementation choices — local names, helper structure, internal layout — are the executor's.
-- The executor implements exactly the brief, reads only its map plus their imports, callers, types and
-  tests, and reports anything else as a blocked question.
-
-### Sections (template order — stable blocks first, so parallel lanes share a cached prefix)
-1. **Rules**: `templates/_rules.md`, identical in every brief (logging with exit codes, bounded reading,
-   gates once, stop after 3 identical errors, scope, tests are evidence, safety, blocked questions).
-2. **Role**, then **Conventions**: only the project rules that apply, quoted verbatim (`conv.sh`).
-3. **Checklist**: only the areas the feature touches (`references/checklist.md` format).
-4. **Workspace**: baseline SHA, exact working directory, branch, env exports, prerequisites, "do not
-   commit".
-5. **Feature**: id and acceptance criteria quoted exactly, plus the spec lines that define it.
-6. **Rulings** R1..Rn: exact semantics — names, codes, limits, formulas, refusal behaviour, versioning,
-   and the dependency contracts not to break. Near-code precision for security, money, persistence and
-   parsing. Anything that parses, validates or gates is FAIL-CLOSED.
-7. **Done means**: the exact assertions the tests must prove.
-8. **Map**: the only files it may create or change, ONE existing feature as the pattern, and the
-   `docs/CODEMAP.md` sections to read. On a large repo add a **graph** block (`"graph"` in the spec):
-   graphify's answers about the symbols it touches, so it never explores to find callers or paths.
-9. **Excerpts**: usually ~2 key functions of the pattern (`excerpt.sh`).
-10. **Gates**: exact per-package commands, wrapped by `gate.sh` when lanes run in parallel.
-11. **Report**: the fixed block (STATUS / FILES / one line per ruling / one line per gate / CHECKLIST /
-    BLOCKED), so a report is scanned in seconds and grepped across lanes.
-
-Use `scripts/brief.mjs` (see `templates/brief-spec.example.json`): it fills the template, pulls
-excerpts, conventions and checklist areas, prefixes gates, and refuses on any gap. ~12 KB is a
-guideline for context cost, not a limit.
-
-### Fix briefs (`templates/fix-brief.md`)
-- Each finding quoted with file:line, then the exact ruling and the test that proves it.
-- Only the affected files; never "re-read the feature".
-- Repeat the rules, workspace, conventions, invariants and still-valid rulings: a fresh session knows
-  nothing.
-- Always a FRESH session per round; never resume the builder (its transcript multiplies cost).
-- Same component with findings 3 rounds in a row: the brief carries a **structural ruling** that removes
-  the whole category ("the caller can no longer name the destination; derive it"), not another patch.
-
-### Integration briefs (`templates/integration-brief.md`)
-- Exact merge order with commit messages and the SHA each merged branch must contain.
-- Renumbering (migrations, decision records) with every reference; code that moved since the branch cut.
-- Authority: commit and push ONLY on the integration branch; the orchestrator merges to main.
-- The invariants that must hold after the merge, each tested; semantic conflicts are reported, never
-  resolved by the executor.
-
-## Part B — Running the pipeline
-
-1. **Plan**: resolve every ambiguity as explicit rulings before any build. On a large repo rebuild the
-   code graph first in the background (`graphify update <repo>`; a brief refuses answers whose cited files changed since). Split the work into lanes,
-   each with the files it owns; give shared hotspots (barrels, lockfiles, migration numbers, generated
-   files) to one lane or to integration, and pick each lane's executor by risk (below).
-2. **Spawn**: one executor per lane with its brief, in its own worktree, as a tracked background job
-   (`references/harnesses.md`). Record each session id.
-3. **Blocked questions**: answer in the SAME session (`SendMessage` / `spawn.mjs --resume <id>`) while
-   its context is small — the executor finished everything else first. Only fix rounds start fresh.
-4. **Check scope, then commit**: `scope-check.sh <worktree> <base> <map...>`; out-of-map files are
-   reverted or ruled on BEFORE review. Check `git status`, commit (the orchestrator commits).
-5. **Review and verify in parallel** on that commit: an independent reviewer (a different model family)
-   and your own light verification.
-6. **Arbitrate**: per finding, AGREE with an exact fix ruling, or DISAGREE / DEFER with a reason. Never
-   forward raw findings. Tag each agreed finding with a category; a category recurring in a second
-   feature becomes a project checklist rule (`references/checklist.md`).
-7. **Fix**: a fresh executor with the fix brief.
-8. **Re-review**: resume the reviewer's OWN session id (never "the last session"); it reads the fix
-   diff PLUS the invariants the fix touches and any open findings — never the fix diff alone.
-9. **Integrate** the batch; the reviewer reviews the final integrated commit (SHA).
-10. **Merge** small batches of 1–3 features as soon as each passes.
-
-### Merge acceptance
-Gates pass on the exact commit being merged; no unresolved P1/P2 findings; every deferral has a written
-reason; the approval is tied to one immutable commit SHA.
-
-### Reviewer grounding
-Every review receives the original requirements/acceptance text, the brief's rulings, read access to the
-repository and the dependency contracts, and explicit permission to challenge a ruling ("if a ruling
-itself is wrong, say so"). Prompt shape: `references/operations.md`.
-
-### Verification levels
-- **Executor**: per-package checks of the packages it changed.
-- **Orchestrator (light)**: whole-repo typecheck and lint once, plus the suites of the changed packages
-  and the apps that consume them. Judge by exit codes, never by piped output.
-- **Full fresh-clone battery**: once at the end, or overnight. Not per merge.
-- Refactors that move files also run tests that scan source text or file lists (architecture tests).
-
-### Model, effort and cost
-- Orchestrate with the strongest affordable model (plan, rule, arbitrate, merge).
-- Route executors by **risk and observed history up front**: plumbing, schemas, CRUD, UI and refactors
-  go to a cheap model at high effort; security rules, parsers of untrusted input, money, renderers and
-  determinism, and cross-system end-to-end work go to a strong model from the start, at max effort for
-  new builds. Fix rounds and integration: high is enough.
-- Track cost per feature (orchestration + execution + review + rework) in the ledger
-  (`references/operations.md`) and let it move component classes between executors.
-
-### Keep the orchestrator's context small
-Read the report block and `result.json`, not transcripts; read the full report and logs only when the
-status is not done, an exit code is non-zero or the verdict is not PASS. Use `excerpt.sh` and the code
-map instead of opening large files.

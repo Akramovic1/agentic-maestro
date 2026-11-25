@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "default": "direct",
+  "models": {
+    "fable": {
+      "harness": "claude",
+      "model": "fable",
+      "effort": "high",
+      "family": "anthropic"
+    },
+    "opus": {
+      "harness": "claude",
+      "model": "opus",
+      "effort": "high",
+      "family": "anthropic"
+    },
+    "sonnet": {
+      "harness": "claude",
+      "model": "sonnet",
+      "effort": "high",
+      "family": "anthropic"
+    },
+    "codex": {
+      "harness": "codex",
+      "model": null,
+      "effort": "high",
+      "family": "openai"
+    },
+    "deepseek": {
+      "harness": "opencode",
+      "model": "opencode/deepseek-v4-pro",
+      "effort": null,
+      "family": "deepseek"
+    },
+    "deepseek-flash": {
+      "harness": "opencode",
+      "model": "opencode/deepseek-v4.1-flash",
+      "effort": null,
+      "family": "deepseek"
+    },
+    "glm": {
+      "harness": "opencode",
+      "model": "opencode/glm-5.3",
+      "effort": null,
+      "family": "zhipu"
+    }
+  },
+  "modes": {
+    "direct": {
+      "title": "Direct: the maestro writes the code",
+      "when": "Strong-model tokens are plentiful and the work is one lane, or it needs judgement no brief can pin down (unsettled design, a hard bug, performance, an unfamiliar codebase).",
+      "cost": "High strong-model tokens; the shortest path for one lane.",
+      "pipeline": "direct",
+      "read": [
+        "references/direct.md",
+        "references/verification.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "reviewer": [
+          "codex",
+          "glm"
+        ],
+        "scout": "sonnet"
+      },
+      "tasks": [
+        "Goal: restate it with the smallest change that meets it",
+        "Baseline: base SHA, gates run once",
+        "Reproduce or specify: failing test for a bug, done-means assertions for a feature, a measured number for performance",
+        "Shape: data shapes and states before logic; remove before adding",
+        "Build in verifiable units, each ending in a passing check",
+        "Prove: gates by exit code, then drive the real artifact and keep the evidence",
+        "Self-review the whole diff as its reviewer would, then commit on the working branch",
+        "Independent review scaled by risk (first reviewer for ordinary work, the whole panel for high-risk); arbitrate every finding",
+        "Harden: promote agreed findings and corrections (references/hardening.md)",
+        "Report with the fixed block: GOAL / CHANGE / EVIDENCE / REVIEW / FINDINGS / HARDENED / OPEN"
+      ],
+      "rules": [
+        "Spend spare tokens on verification first, then the reviewer panel for high-risk changes, then a bake-off for a design fork with no precedent.",
+        "More than one lane is a delegate mode's work: ask the user whether frontier or economy."
+      ]
+    },
+    "frontier": {
+      "title": "Frontier: a strong maestro conducts strong coders",
+      "when": "Ordinary code, plenty of strong-model tokens, and work that splits into lanes.",
+      "cost": "Highest total tokens; best quality per lane and the most parallelism.",
+      "pipeline": "delegate",
+      "read": [
+        "references/delegate.md",
+        "references/harnesses.md",
+        "references/operations.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "executor": "opus",
+        "reviewer": "codex",
+        "scout": "sonnet"
+      },
+      "tasks": [
+        "Plan: rulings for every ambiguity, lanes with the files each owns, shared hotspots assigned",
+        "Brief each lane (scripts/brief.mjs)",
+        "Spawn one executor per lane in its own worktree, tracked; record session ids",
+        "Answer blocked questions in the same session",
+        "Scope-check, then commit (the maestro commits)",
+        "Independent review, and verification on that commit in parallel: gates, plus runtime evidence where it can run (references/verification.md)",
+        "Arbitrate every finding; tag each agreed one with a category",
+        "Fix with a fresh executor and a fix brief; re-review in the reviewer's own session",
+        "Integrate the batch; review the integrated commit; merge small batches",
+        "Harden: promote recurring categories (references/hardening.md)"
+      ],
+      "rules": [
+        "A strong executor still gets exact rulings and an owned file map: parallel writers need them whatever their model.",
+        "The maestro writes no feature code in this mode, except a change small enough to do inline (one file and under ~50 changed lines)."
+      ]
+    },
+    "critical": {
+      "title": "Critical: strong coders, red team on the plan and on the commit",
+      "when": "Building or changing code that moves money or value, grants authority, handles keys or secrets, or is a smart contract; and anything the user calls critical.",
+      "cost": "The most expensive build mode: strong coders only, two security passes, property tests required.",
+      "pipeline": "delegate",
+      "read": [
+        "references/delegate.md",
+        "references/harnesses.md",
+        "references/operations.md",
+        "references/redteam.md",
+        "references/verification.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "executor": "opus",
+        "reviewer": "codex",
+        "redteam": [
+          "codex",
+          "glm"
+        ],
+        "scout": "sonnet"
+      },
+      "tasks": [
+        "Plan: rulings, the invariants in plain statements, trust boundaries, lanes with the files each owns (smart contracts: run scripts/toolcheck.sh contracts first and name what is missing)",
+        "Red team the plan (references/redteam.md); resolve every agreed finding and re-issue the plan before any code",
+        "Brief each lane (scripts/brief.mjs); done-means carries a property or invariant test for every invariant the lane touches",
+        "Spawn one executor per lane in its own worktree, tracked; record session ids",
+        "Answer blocked questions in the same session",
+        "Scope-check, then commit (the maestro commits)",
+        "Independent review, and verification on that commit in parallel: gates, property tests, runtime evidence (references/verification.md)",
+        "Arbitrate every finding; fix with a fresh executor and a fix brief; re-review in the reviewer's own session",
+        "Integrate; red team the integrated commit; confirm each reproduction in a scratch worktree at that SHA",
+        "Fix agreed security findings with a fresh executor; the red-team reviewer that raised each re-checks it, and the reviewer re-reviews the fix diff, on the new SHA",
+        "Merge only when every agreed plan finding is resolved, and the review and the red team are both clear on the exact SHA being merged",
+        "Harden: every agreed security category becomes a check on its first occurrence (references/hardening.md)"
+      ],
+      "rules": [
+        "No cheap coders and no inline exception: every change goes through a brief, a review and the red team.",
+        "Anything that parses, validates or gates refuses malformed, incomplete or contradictory input; an exception refuses.",
+        "Smart contracts: local and forked chains only. No live-network transaction and no private key in the session.",
+        "Propose the audit mode before a first deployment or release, and after a large change to value-moving or authority logic."
+      ]
+    },
+    "economy": {
+      "title": "Economy: a strong maestro conducts cheap coders",
+      "when": "Saving strong-model tokens: many similar features, plumbing, schemas, CRUD, UI, mechanical refactors behind exact rulings.",
+      "cost": "Lowest strong-model tokens per feature; more wall-clock and more fix rounds.",
+      "pipeline": "delegate",
+      "read": [
+        "references/delegate.md",
+        "references/harnesses.md",
+        "references/operations.md",
+        "references/checklist.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "executor": "deepseek",
+        "executorStrong": "opus",
+        "reviewer": "codex",
+        "scout": "deepseek-flash"
+      },
+      "tasks": [
+        "Plan: rulings for every ambiguity, lanes with the files each owns, each lane routed by risk",
+        "Brief each lane completely (scripts/brief.mjs): the executor knows nothing the brief does not say",
+        "Spawn one executor per lane in its own worktree, tracked; record session ids",
+        "Answer blocked questions in the same session",
+        "Scope-check, then commit (the maestro commits)",
+        "Independent review, and verification on that commit in parallel: gates, plus runtime evidence where it can run (references/verification.md)",
+        "Arbitrate every finding; tag each agreed one with a category",
+        "Fix with a fresh executor and a fix brief; re-review in the reviewer's own session",
+        "Integrate the batch; review the integrated commit; merge small batches",
+        "Harden: promote recurring categories (references/hardening.md); record cost in the ledger"
+      ],
+      "rules": [
+        "High-risk work goes to executorStrong from the start.",
+        "A component class that needed 3 or more fix rounds on the cheap executor moves to executorStrong next time.",
+        "The maestro writes no feature code in this mode, except a change small enough to do inline (one file and under ~50 changed lines)."
+      ]
+    },
+    "reserve": {
+      "title": "Reserve: no strong-model credits left",
+      "when": "The model you normally conduct with is out of credits. Run the skill from Codex or OpenCode; the best model still available conducts and cheap models code.",
+      "cost": "No strong-model tokens. Slower, with smaller lanes and a review on everything.",
+      "pipeline": "delegate",
+      "read": [
+        "references/delegate.md",
+        "references/harnesses.md",
+        "references/operations.md",
+        "references/checklist.md"
+      ],
+      "roles": {
+        "maestro": "codex",
+        "executor": "deepseek",
+        "reviewer": "glm",
+        "scout": "deepseek-flash"
+      },
+      "tasks": [
+        "Plan: rulings for every ambiguity; lanes of one package and under ~200 changed lines",
+        "Brief each lane completely (scripts/brief.mjs), with the full checklist areas it touches",
+        "Spawn one executor per lane in its own worktree, tracked; record session ids",
+        "Answer blocked questions in the same session",
+        "Scope-check, then commit (the maestro commits)",
+        "Independent review on every commit, trivial ones included",
+        "Arbitrate every finding; tag each agreed one with a category",
+        "Fix with a fresh executor and a fix brief; re-review in the reviewer's own session",
+        "Integrate and merge one feature at a time",
+        "List what should be re-reviewed by a strong model when credits return"
+      ],
+      "rules": [
+        "High-risk work needs the user's go-ahead in this mode: ask once, naming the parts; parts not approved are parked with a written note.",
+        "No risk tier skips review here: a weaker maestro's rulings need the second opinion more.",
+        "Three fix rounds on one component: stop and park it, do not start a fourth."
+      ]
+    },
+    "redteam": {
+      "title": "Red team: security check of a plan or a commit",
+      "when": "On request, or proposed by the maestro: before committing to a design that crosses trust boundaries, and on the integrated commit of high-risk work.",
+      "cost": "Read-only reviewers; no code is changed. Cost scales with the size of the scope given.",
+      "pipeline": "review",
+      "read": [
+        "references/redteam.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "redteam": [
+          "codex",
+          "glm"
+        ]
+      },
+      "tasks": [
+        "Scope: the exact plan revision or commit SHA, and the trust boundaries it crosses",
+        "Write the review prompt with the grounding (requirements, rulings, contracts) and the areas to cover",
+        "Dispatch each red-team reviewer read-only, in parallel; record session ids",
+        "Confirm each reproduction. A commit: run the reviewer's test in a scratch worktree at the reviewed SHA; it must fail there. A plan: check that the stated sequence of calls or inputs really follows from the rulings",
+        "Arbitrate the union of findings: AGREE with an exact ruling, or DISAGREE / DEFER with a reason",
+        "Hand agreed findings to a build mode as fix briefs; keep each reproduction as a regression test",
+        "Re-check each fix in the session of the reviewer that raised it, on the new SHA or plan revision",
+        "Harden: name the check each agreed category needs; the check itself is written in the build mode that fixes the finding (references/hardening.md)",
+        "Report: scope, areas covered and not covered, findings by severity, verdict, what is still open"
+      ],
+      "rules": [
+        "This mode changes no product code. Fixes go through a build mode, with the strongest coder that mode has.",
+        "An area that could not be covered is reported as not covered, never as clean.",
+        "Review the user's own code and systems only."
+      ]
+    },
+    "audit": {
+      "title": "Audit: a full security review of a contract system or a critical API",
+      "when": "Before a first deployment or release of a contract system, or of an API that moves money or grants authority; after a large change to its value-moving or authority logic; or on request.",
+      "cost": "The most expensive review: analyzers, a reviewer panel, property tests and a proof for every finding. Read-only on the code under review.",
+      "pipeline": "review",
+      "read": [
+        "references/audit.md",
+        "references/redteam.md",
+        "references/verification.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "redteam": [
+          "codex",
+          "glm"
+        ],
+        "executor": "opus",
+        "scout": "sonnet"
+      },
+      "skills": {
+        "contracts": [
+          "x-ray",
+          "entry-point-analyzer:entry-point-analyzer",
+          "building-secure-contracts:secure-workflow-guide",
+          "solidity-auditor",
+          "building-secure-contracts:token-integration-analyzer",
+          "fizz",
+          "property-based-testing:property-based-testing",
+          "spec-to-code-compliance:spec-to-code-compliance",
+          "fp-check:fp-check",
+          "variant-analysis:variant-analysis"
+        ],
+        "api": [
+          "audit-context-building:audit-context-building",
+          "static-analysis:semgrep",
+          "static-analysis:codeql",
+          "supply-chain-risk-auditor:supply-chain-risk-auditor",
+          "differential-review:differential-review",
+          "insecure-defaults:insecure-defaults",
+          "sharp-edges:sharp-edges",
+          "property-based-testing:property-based-testing",
+          "spec-to-code-compliance:spec-to-code-compliance",
+          "fp-check:fp-check",
+          "variant-analysis:variant-analysis"
+        ]
+      },
+      "tasks": [
+        "Before starting: confirm the target is the user's own code; run scripts/toolcheck.sh contracts|api|all; name the missing tools and skills",
+        "Scope: SHA, files in scope, specification, privileged roles, trust assumptions (scope.md)",
+        "Context: actors, assets, every entry point in one table, integrations, the invariants I1..In (context.md)",
+        "Deterministic pass: every analyzer available; triage results into candidates; a missing tool is 'not covered'",
+        "Panel review: each red-team model read-only, every area read by two model families",
+        "Properties: each invariant becomes a fuzz, invariant or property test in a scratch worktree",
+        "Specification against code: one row per claim (spec.md)",
+        "Prove every candidate: confirmed with a failing test, rejected with a reason, or unconfirmed with what would settle it",
+        "Report: severity, coverage table, invariants, spec table, residual risk (report.md)",
+        "Fix and re-check: fixes go through critical unless the user picks another build mode; each fix re-checked on the new SHA by the reviewer that raised it; search for siblings",
+        "Harden: name the detector, lint rule or invariant test each confirmed class needs; it is written in the build mode that fixes the finding"
+      ],
+      "rules": [
+        "Read-only on the code under review; tests and proofs live in a scratch worktree.",
+        "Local and forked chains only. No live-network transaction, no private key or seed phrase in the session.",
+        "Nothing is installed unasked. A missing analyzer is named and its checks are reported as not covered. A missing skill is named; its phase is still done, by the method in references/audit.md.",
+        "The report certifies nothing: it says what was looked for and what was found, and what an independent audit should look at first."
+      ]
+    },
+    "harden": {
+      "title": "Harden: make the repository hard to get wrong",
+      "when": "After a run of features, when the same findings keep returning, or before letting agents work with less review.",
+      "cost": "Mostly small, mechanical changes; cleanup lanes can go to cheap coders.",
+      "pipeline": "direct",
+      "read": [
+        "references/hardening.md",
+        "references/verification.md",
+        "references/checklist.md"
+      ],
+      "roles": {
+        "maestro": "fable",
+        "executor": "deepseek",
+        "reviewer": "codex"
+      },
+      "tasks": [
+        "Collect categories: the ledger's findings column, the project checklist, recent review reports, corrections the user has repeated",
+        "Rank by recurrence and risk; take the top few, not all",
+        "For each, pick the highest rung of the ladder that fits: impossible by structure, static rule, test, runtime check",
+        "Write the rule with a message that tells the reader the root-cause fix",
+        "Clean the existing occurrences in the same batch, or record a baseline that may only go down",
+        "Wire the rule into the gates the briefs already run",
+        "Delete the prose line the rule replaces",
+        "Fill gaps in the feature map and the driver, when the user asked for it or agrees (references/verification.md)",
+        "Independent review of the rules: do they catch the original finding, do they block legitimate code",
+        "Report: category -> check, occurrences cleaned, prose removed, what stays as judgement"
+      ],
+      "rules": [
+        "When the user names the categories, do those and nothing else; collecting and ranking are for an open-ended request.",
+        "A new rule is proven by a test or sample that fails without it.",
+        "Large cleanups are lanes: brief them for this mode's executor (references/delegate.md).",
+        "Prose is deleted from the project's own checklist or instruction file; the skill's files are never edited."
+      ]
+    }
+  }
+}
