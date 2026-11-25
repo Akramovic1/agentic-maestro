@@ -47,7 +47,7 @@ for (const k of ['quiet-after', 'dead-after']) if (!/^[1-9][0-9]*$/.test(opt[k])
 const quietMs = Number(opt['quiet-after']) * 60_000;
 const deadMs = Number(opt['dead-after']) * 1000;
 root = resolve(root ?? '.agent-runs');
-if (!existsSync(root)) fail(2, `no such runs directory: ${root}`);
+if (!existsSync(root)) fail(2, `no such runs directory: ${root}\n  It is created by the first agent spawned from a project. Run this from that project's folder, or pass the path.`);
 
 const now = Date.now();
 const readJson = (p) => {
