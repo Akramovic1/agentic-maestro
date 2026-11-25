@@ -9,6 +9,10 @@
 //        [--bin <path>] [--no-lean] [--dry-run] [-- <extra CLI args>]
 //
 // Writes into <run-dir> (created; must be empty or absent):
+//   run.json      written at start: harness, model, mode, feature/round/role, start time, timeout and
+//                 the pids of this launcher and of the agent CLI
+//   heartbeat     rewritten every 15 s while this launcher is alive; scripts/runs.mjs reads it to tell
+//                 a running job from one whose launcher died
 //   command.txt   the exact argv (the brief is not repeated: it is stdin)
 //   events.jsonl  the CLI's raw stdout (JSON / JSONL events)
 //   stderr.log    the CLI's raw stderr
@@ -152,6 +156,21 @@ const started = Date.now();
 const child = spawn(cmd, args, { cwd: dir, env, stdio: ['pipe', outFd, errFd], detached: true });
 child.stdin.on('error', () => {}); // a CLI that exits early closes stdin; the exit code tells the story
 child.stdin.end(brief);
+writeFileSync(join(out, 'run.json'), JSON.stringify({
+  harness: opts.harness, model: opts.model ?? null, effort: opts.effort ?? null, mode: opts.mode,
+  feature: opts.feature ?? null, round: opts.round ?? null, role: opts.role ?? null,
+  startedAt: new Date(started).toISOString(), timeoutSec: Number(opts.timeout),
+  launcherPid: process.pid, childPid: child.pid ?? null, cwd: dir,
+}, null, 2) + '\n');
+const beat = () => {
+  try {
+    writeFileSync(join(out, 'heartbeat'), new Date().toISOString() + '\n');
+  } catch {
+    /* the run directory is gone; the close handler reports what happened */
+  }
+};
+beat();
+const heart = setInterval(beat, 15_000);
 
 let timedOut = false;
 const killGroup = (sig) => {
@@ -174,6 +193,7 @@ child.on('error', (e) => {
 
 child.on('close', (code, signal) => {
   clearTimeout(timer);
+  clearInterval(heart);
   closeSync(outFd);
   closeSync(errFd);
   const seconds = Math.round((Date.now() - started) / 1000);

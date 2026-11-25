@@ -5,8 +5,9 @@ The pipeline is the same on every harness; only the spawn call differs. Two ways
 - **In-process sub-agent** (Claude Code's Agent tool): no CLI, the report comes back as the tool
   result, follow-ups go through `SendMessage`. Cheapest to wire up when the orchestrator is Claude Code.
 - **Headless CLI** (`claude -p`, `codex exec`, `opencode run`) through `scripts/spawn.mjs`: any
-  orchestrator, any mix of vendors, and every run leaves a run directory (`command.txt`,
-  `events.jsonl`, `stderr.log`, `final.md`, `result.json`) plus an optional ledger row.
+  orchestrator, any mix of vendors, and every run leaves a run directory (`run.json` and a
+  `heartbeat` while it runs, `command.txt`, `events.jsonl`, `stderr.log`, `final.md`, `result.json`)
+  plus an optional ledger row. `scripts/runs.mjs` reads those to show which runs are alive.
 
 Commands below are run from the project directory; `scripts/...` means `<skill>/scripts/...`. Take
 `--harness`, `--model` and `--effort` from the mode (`mode.mjs args <mode> <role>`); the literal

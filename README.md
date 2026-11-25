@@ -254,6 +254,7 @@ looks like this:
 | [`templates/`](templates/) | Build, fix and integration briefs; the shared rules block; a Claude Code agent definition; an example spec |
 | [`scripts/brief.mjs`](scripts/brief.mjs) | Assembles a brief from a JSON spec; fails closed on any gap |
 | [`scripts/spawn.mjs`](scripts/spawn.mjs) | Runs one headless agent on `claude`, `codex` or `opencode`; writes `result.json` and a ledger row |
+| [`scripts/runs.mjs`](scripts/runs.mjs) | Shows every run's state (running, quiet, orphaned, or how it ended) from the heartbeat `spawn.mjs` leaves |
 | [`scripts/scope-check.sh`](scripts/scope-check.sh) | Lists changed files outside the brief's map |
 | [`scripts/codemap.mjs`](scripts/codemap.mjs) | Generates `docs/CODEMAP.md` for JS/TS workspaces, or `--generic` for any git repo |
 | [`scripts/excerpt.sh`](scripts/excerpt.sh), [`scripts/conv.sh`](scripts/conv.sh) | A pattern excerpt; matching convention bullets, verbatim |
@@ -271,8 +272,10 @@ looks like this:
 | Lean by default | no MCP, no skills | — | no `~/.claude` prompt/skills |
 | Recorded | session, tokens, cost | session, tokens | session |
 
-Every run writes `command.txt`, `events.jsonl`, `stderr.log`, `final.md` and `result.json`; the exit
-code is the CLI's own (124 timeout, 127 missing CLI, 3 no report).
+Every run writes `run.json` and a `heartbeat` while it runs, then `command.txt`, `events.jsonl`,
+`stderr.log`, `final.md` and `result.json`; the exit code is the CLI's own (124 timeout, 127 missing
+CLI, 3 no report). `node scripts/runs.mjs .agent-runs --active` lists the jobs still in flight and
+flags the ones that went quiet or lost their launcher.
 
 ## Compatibility
 

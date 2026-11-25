@@ -36,6 +36,11 @@ Defaults from one setup; adjust per machine.
 ## Background jobs
 - Track every background job (the harness's background task, or `spawn.mjs` under a watcher); never
   fire-and-forget with `&`. A "running" status with a dead process is orphaned: cancel and relaunch.
+- Check jobs with `scripts/runs.mjs .agent-runs --active`, not by reading transcripts. It reads the
+  heartbeat `spawn.mjs` leaves every 15 seconds: **running** is alive and writing; **quiet** is alive
+  but silent for 10 minutes (read the tail of `stderr.log`, stop it if it is looping or waiting);
+  **orphaned** means the launcher died — stop the agent pid it names, then relaunch into a NEW run
+  directory. It exits 1 when any run needs attention, so a watcher can call it.
 - Run CLI agents with stdin closed or fed (`spawn.mjs` feeds the brief and closes it); some wait for
   stdin forever otherwise.
 

@@ -234,6 +234,7 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 | [`templates/`](templates/) | 构建、修复、集成简报模板；共享规则块；Claude Code 代理定义；规格示例 |
 | [`scripts/brief.mjs`](scripts/brief.mjs) | 从 JSON 规格组装简报；任何缺失都会拒绝 |
 | [`scripts/spawn.mjs`](scripts/spawn.mjs) | 以无头模式在 `claude`、`codex` 或 `opencode` 上运行一个代理；写入 `result.json` 和台账记录 |
+| [`scripts/runs.mjs`](scripts/runs.mjs) | 根据 `spawn.mjs` 留下的心跳显示每次运行的状态（运行中、无输出、失去启动器，或如何结束） |
 | [`scripts/scope-check.sh`](scripts/scope-check.sh) | 列出超出简报文件范围的改动 |
 | [`scripts/codemap.mjs`](scripts/codemap.mjs) | 为 JS/TS 工作区生成 `docs/CODEMAP.md`，或用 `--generic` 处理任意 git 仓库 |
 | [`scripts/excerpt.sh`](scripts/excerpt.sh)、[`scripts/conv.sh`](scripts/conv.sh) | 范式代码摘录；逐字引用匹配的约定条目 |

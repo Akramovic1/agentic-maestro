@@ -31,6 +31,7 @@ that reads Agent Skills.
 | `scripts/toolcheck.sh` | Lists which security analyzers are installed, so a report never implies coverage it did not have |
 | `scripts/brief.mjs` | Assembles a brief from a JSON spec; refuses any missing value, excerpt or convention |
 | `scripts/spawn.mjs` | Runs one headless agent (`claude`, `codex` or `opencode`) on a brief and records session id, exit code, tokens and cost |
+| `scripts/runs.mjs` | Shows which runs are still working, which went quiet and which lost their launcher, without reading a transcript |
 | `scripts/scope-check.sh` | Lists files an executor changed outside its brief's map, before you spend a review |
 | `scripts/codemap.mjs` | Generates `docs/CODEMAP.md` so executors navigate without exploring |
 | `scripts/excerpt.sh`, `scripts/conv.sh` | Quote a pattern excerpt and the matching project conventions into a brief |

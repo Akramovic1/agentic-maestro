@@ -306,6 +306,7 @@ node scripts/spawn.mjs --harness claude   --model sonnet --effort high --brief .
 | [`templates/`](templates/) | موجزات البناء والإصلاح والدمج، وكتلة القواعد المشتركة، وتعريف وكيل لـ Claude Code، ومثال مواصفة |
 | [`scripts/brief.mjs`](scripts/brief.mjs) | يجمع موجزًا من مواصفة JSON؛ ويرفض عند أي نقص |
 | [`scripts/spawn.mjs`](scripts/spawn.mjs) | يشغّل وكيلًا واحدًا دون واجهة على `claude` أو `codex` أو `opencode`؛ ويكتب `result.json` وسطرًا في السجل |
+| [`scripts/runs.mjs`](scripts/runs.mjs) | يعرض حالة كل تشغيل (يعمل، صامت، يتيم، أو كيف انتهى) من نبضة يتركها `spawn.mjs` |
 | [`scripts/scope-check.sh`](scripts/scope-check.sh) | يسرد الملفات المتغيرة خارج خريطة الموجز |
 | [`scripts/codemap.mjs`](scripts/codemap.mjs) | يولّد `docs/CODEMAP.md` لمساحات JS/TS، أو `--generic` لأي مستودع git |
 | [`scripts/excerpt.sh`](scripts/excerpt.sh)، [`scripts/conv.sh`](scripts/conv.sh) | مقتطف نمط؛ وبنود الأعراف المطابقة حرفيًا |

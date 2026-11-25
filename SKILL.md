@@ -159,6 +159,7 @@ the playbook that explains its tasks.
 | `scripts/toolcheck.sh contracts\|api\|all` | Lists which analyzers are installed, so a report says "not covered" for a missing one |
 | `scripts/brief.mjs <spec.json> --out <file>` | Assembles a brief from a JSON spec; refuses missing values, excerpts or keywords |
 | `scripts/spawn.mjs --harness claude\|codex\|opencode ...` | Runs one headless agent; writes `result.json` (session id, exit, tokens) and a ledger row |
+| `scripts/runs.mjs [<runs-dir>] [--active]` | Shows every run's state — running, quiet, orphaned, or how it ended — without reading a transcript |
 | `scripts/scope-check.sh <worktree> <base> <allowed>...` | Lists changed files outside the brief's map |
 | `scripts/excerpt.sh`, `scripts/conv.sh` | A pattern excerpt; the matching convention bullets, verbatim |
 | `scripts/codemap.mjs <repo> [groups] \| --generic` | Generates `docs/CODEMAP.md` (JS/TS workspaces, or any git repo) |

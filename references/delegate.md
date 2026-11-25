@@ -85,6 +85,8 @@ guideline for context cost, not a limit.
    On Claude Code a role whose harness is `claude` may instead run in-process through the Agent tool,
    with the call's `model` set from the mode; every other role goes through `spawn.mjs`.
    Record each session id.
+   While lanes run, watch them with `scripts/runs.mjs .agent-runs --active`: it says which are
+   running, quiet or orphaned without a transcript being read (`operations.md`).
 3. **Blocked questions**: answer in the SAME session (`SendMessage` / `spawn.mjs --resume <id>`) while
    its context is small — the executor finished everything else first. Only fix rounds start fresh.
 4. **Check scope, then commit**: `scope-check.sh <worktree> <base> <map...>`; out-of-map files are
