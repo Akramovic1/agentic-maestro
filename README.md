@@ -6,9 +6,10 @@
 
 **One strong model conducts. Cheaper models play. Quality holds.**
 
-An [Agent Skill](https://agentskills.io) for orchestrated delegation: a strong model plans, rules,
-arbitrates and merges; cheaper sub-agents execute precise briefs; an independent reviewer checks
-every result — on **Claude Code**, **Codex** and **OpenCode**.
+An [Agent Skill](https://agentskills.io) for building high-quality code with agents, in the working
+mode that fits the session: the strong model writes the code itself, conducts strong coders, or
+conducts cheap ones; a red team or a full audit covers the code that matters; an independent reviewer
+checks every result — on **Claude Code**, **Codex** and **OpenCode**.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-supported-d97757)
@@ -27,13 +28,49 @@ every result — on **Claude Code**, **Codex** and **OpenCode**.
 
 ---
 
+## Modes
+
+A mode says who writes the code, who reviews it, and which tasks run in which order. Name the mode
+with your task ("frontier: build the export feature", "audit the staking contracts"); with none
+named, the maestro picks one or asks a single question.
+
+| Mode | Who writes the code | For |
+|---|---|---|
+| `direct` | The strong model itself | Plenty of strong-model tokens, one lane, or work that needs judgement |
+| `frontier` | Strong coders, conducted by the strong model | Ordinary code that splits into parallel lanes |
+| `critical` | Strong coders only | Important APIs and smart contracts: red team on the plan and on the commit, property tests required |
+| `economy` | Cheap coders (DeepSeek, GLM, ...) | Saving strong-model tokens on work behind exact rulings |
+| `reserve` | Cheap coders, conducted by the best model still available | Strong-model credits are used up |
+| `redteam` | Nobody (read-only) | A security check of one plan or one commit |
+| `audit` | Nobody (tests in a scratch copy) | A full security review of a contract system or a critical API |
+| `harden` | The strong model, cheap coders for cleanup | Turning recurring findings into lint rules, types and tests |
+
+Every mode stands on the same floor: rulings before code, tests as evidence, proof on the running
+artifact, an independent reviewer from a different model family, and every repeated correction turned
+into a check that runs in the gates. Ordinary code is not over-secured: the security passes are for
+code that moves money, grants authority or runs on-chain.
+
+The modes live in one JSON file: a model for each role, the files to read, the ordered tasks, the
+rules. Copy it and make it yours.
+
+```bash
+node scripts/mode.mjs list            # the modes in effect, with their lineups
+node scripts/mode.mjs init --user     # copy to ~/.config/agentic-maestro/modes.json and edit
+node scripts/mode.mjs check           # refuses an unknown role or model, and a reviewer from the coder's own family
+```
+
+`audit` and `critical` can lean on specialist skills you already have installed (for example the audit
+skills published by Trail of Bits and Pashov Audit Group): a mode names them, the maestro loads the
+ones that are there and says which are missing. Details: [references/modes.md](references/modes.md).
+
 ## Why
 
 Handing work to a sub-agent is easy. Handing it over **cheaply without losing quality** is not:
 executors explore the whole repo, re-read the same docs, guess at design decisions, loop on errors,
 and come back with a transcript instead of an answer. The orchestrator then pays again to read it.
 
-agentic-maestro turns delegation into a repeatable pipeline:
+agentic-maestro turns delegation into a repeatable pipeline (the `frontier`, `critical`, `economy` and
+`reserve` modes):
 
 - **Briefs instead of context.** Executors get exact rulings, a "done means" list, one pattern to copy
   (with excerpts), only the conventions that apply (quoted), a code-map pointer and a pre-review
@@ -77,8 +114,9 @@ flowchart LR
     K -.-> B
 ```
 
-The orchestrator never writes feature code and never forwards raw findings; executors never decide
-design questions. See [SKILL.md](SKILL.md) for the full playbook.
+That is the delegate pipeline: the maestro writes no feature code and never forwards raw findings;
+executors never decide design questions. In `direct` the maestro writes the code itself, on the same
+floor. [SKILL.md](SKILL.md) picks the mode; [`references/`](references/) holds each playbook.
 
 ## Install
 
@@ -167,6 +205,9 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 
 <p align="center"><img src="assets/demo.gif" alt="Terminal demo: install, assemble a brief, spawn executors on Codex, OpenCode and Claude Code, scope-check, read the report" width="760"></p>
 
+Name a mode in your request and the agent follows that mode's task list. By hand, a delegate mode
+looks like this:
+
 1. **Plan** with rulings, not prose. Split the work into lanes that own their files.
 2. **Write a spec** (see [`templates/brief-spec.example.json`](templates/brief-spec.example.json)) and
    assemble the brief:
@@ -195,7 +236,17 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 
 | Path | Purpose |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The playbook: when to spawn, writing briefs, running the pipeline |
+| [`SKILL.md`](SKILL.md) | How to pick a mode each session, the rules every mode shares, what to read next |
+| [`templates/modes.json`](templates/modes.json) | The built-in modes: a model for each role, files to read, ordered tasks, rules |
+| [`references/modes.md`](references/modes.md) | The modes file format, where your own copy lives, common edits |
+| [`references/direct.md`](references/direct.md) | The strong model writes the code: the loop, playbooks for bug fix, feature, refactor and performance, the report block |
+| [`references/delegate.md`](references/delegate.md) | Writing a brief and running build -> review -> fix -> merge with executors |
+| [`references/redteam.md`](references/redteam.md) | A read-only security check of a plan or a commit |
+| [`references/audit.md`](references/audit.md) | A full security review of a contract system or a critical API, in ten phases |
+| [`references/hardening.md`](references/hardening.md) | Turning review findings and corrections into types, lint rules and tests |
+| [`references/verification.md`](references/verification.md) | Proving work on the real artifact: runtime evidence, feature map, driver, property and formal checks |
+| [`scripts/mode.mjs`](scripts/mode.mjs) | Lists, shows and validates modes; prints the launcher arguments for a role |
+| [`scripts/toolcheck.sh`](scripts/toolcheck.sh) | Lists which security analyzers are installed, so a report says "not covered" for a missing one |
 | [`references/harnesses.md`](references/harnesses.md) | Spawn calls per harness (Agent tool, `claude -p`, `codex exec`, `opencode run`), resume, permissions, pitfalls |
 | [`references/checklist.md`](references/checklist.md) | Default pre-review checklist and how a project grows its own |
 | [`references/operations.md`](references/operations.md) | Concurrency, lane ownership, git, reviewer prompts, context hygiene, cost ledger |
@@ -233,6 +284,15 @@ v1 command line); the shell scripts were also exercised on Linux (`debian:bookwo
 Issues and pull requests are welcome. Rules that came from real review findings are the most valuable
 contributions: describe the recurring finding, the general rule, and how it would have been caught.
 Keep `SKILL.md` lean — detail belongs in `references/`.
+
+## Credits
+
+The direct mode, the hardening ladder and the weight on verification draw on Lauren Tan's talk
+"All Code Is Slop (Except Mine)" and her [pstack](https://github.com/cursor/plugins/tree/main/pstack)
+plugin. The audit mode is designed to work alongside the skills of
+[Trail of Bits](https://github.com/trailofbits/skills) and
+[Pashov Audit Group](https://github.com/pashov/skills) when they are installed; none of their text is
+included here.
 
 ## License
 

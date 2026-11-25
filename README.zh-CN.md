@@ -6,9 +6,9 @@
 
 **强模型指挥，低成本模型演奏，质量不打折。**
 
-一个用于编排式委派的 [Agent Skill](https://agentskills.io)：强模型负责规划、裁定、仲裁与合并；
-低成本子代理执行精确的任务简报（brief）；独立审查者检查每一个结果——支持 **Claude Code**、**Codex**
-和 **OpenCode**。
+一个用代理构建高质量代码的 [Agent Skill](https://agentskills.io)，按会话选择合适的工作模式：强模型亲自写代码、
+指挥强执行者，或指挥低成本执行者；红队审查或完整审计覆盖关键代码；独立审查者检查每一个结果——支持
+**Claude Code**、**Codex** 和 **OpenCode**。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-supported-d97757)
@@ -26,6 +26,37 @@
 </div>
 
 ---
+
+## 模式
+
+模式决定谁写代码、谁审查，以及按什么顺序执行哪些任务。在请求里直接说出模式（"frontier：实现导出功能"、
+"audit 质押合约"）；没有指定时，maestro 会自行选择，或只问一个问题。
+
+| 模式 | 谁写代码 | 适用场景 |
+|---|---|---|
+| `direct` | 强模型自己 | 强模型额度充足、只有一条车道，或需要判断力的工作 |
+| `frontier` | 强执行者，由强模型指挥 | 可拆成并行车道的普通代码 |
+| `critical` | 只用强执行者 | 重要 API 与智能合约：对方案和提交各做一次红队审查，必须有属性测试 |
+| `economy` | 低成本执行者（DeepSeek、GLM 等） | 在有精确裁定的工作上节省强模型额度 |
+| `reserve` | 低成本执行者，由当前可用的最好模型指挥 | 强模型额度已用完 |
+| `redteam` | 无（只读） | 对单个方案或单个提交做安全检查 |
+| `audit` | 无（测试写在临时副本里） | 对合约系统或关键 API 做完整安全审计 |
+| `harden` | 强模型，清理工作交给低成本执行者 | 把反复出现的审查发现变成 lint 规则、类型和测试 |
+
+所有模式共用同一条底线：先裁定后写代码、测试即证据、在真实运行的产物上验证、由不同模型家族的独立审查者
+审查、每一次重复的纠正都变成自动运行的检查。普通代码不做过度防护：安全审查只用于转移资金、授予权限或
+链上运行的代码。
+
+所有模式都定义在一个 JSON 文件里：每个角色用哪个模型、要读哪些文件、任务顺序和规则。复制一份按需修改：
+
+```bash
+node scripts/mode.mjs list            # 当前生效的模式及其模型阵容
+node scripts/mode.mjs init --user     # 复制到 ~/.config/agentic-maestro/modes.json 后编辑
+node scripts/mode.mjs check           # 拒绝未知的角色或模型，以及与写代码者同一家族的审查者
+```
+
+`audit` 和 `critical` 可以借助你已安装的专业技能（例如 Trail of Bits 和 Pashov Audit Group 发布的审计技能）：
+模式里写明名称，maestro 加载已安装的，并说明缺少哪些。详见 [references/modes.md](references/modes.md)。
 
 ## 为什么
 
@@ -73,7 +104,9 @@ flowchart LR
     K -.-> B
 ```
 
-编排者从不编写功能代码，也从不原样转发审查发现；执行者从不做设计决策。完整手册见 [SKILL.md](SKILL.md)。
+这是委派流水线（`frontier`、`critical`、`economy`、`reserve`）：maestro 不写功能代码，也不原样转发审查发现；
+执行者不做设计决策。在 `direct` 模式下，maestro 在同一条底线上亲自写代码。[SKILL.md](SKILL.md) 负责选择模式，
+各模式的手册在 [`references/`](references/) 中。
 
 ## 安装
 
@@ -157,6 +190,8 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 
 <p align="center"><img src="assets/demo.gif" alt="终端演示：安装、组装简报、在 Codex、OpenCode 和 Claude Code 上启动执行者、范围检查、阅读报告" width="760"></p>
 
+在请求中说出模式，代理就会按该模式的任务清单执行。手动操作时，委派模式的流程如下：
+
 1. **用裁定而不是描述来规划。** 把工作拆成若干条各自拥有文件的"车道"（lane）。
 2. **编写规格**（见 [`templates/brief-spec.example.json`](templates/brief-spec.example.json)）并组装简报：
 
@@ -182,7 +217,17 @@ node ~/agentic-maestro/scripts/spawn.mjs --harness codex --brief README.md --dir
 
 | 路径 | 用途 |
 |---|---|
-| [`SKILL.md`](SKILL.md) | 手册：何时委派、如何编写简报、如何运行流水线 |
+| [`SKILL.md`](SKILL.md) | 每次会话如何选择模式、所有模式共用的规则、接下来读什么 |
+| [`templates/modes.json`](templates/modes.json) | 内置模式：每个角色的模型、要读的文件、任务顺序、规则 |
+| [`references/modes.md`](references/modes.md) | 模式文件的格式、你自己的副本放在哪里、常见修改 |
+| [`references/direct.md`](references/direct.md) | 强模型亲自写代码：循环、修 bug／功能／重构／性能的手册、报告块 |
+| [`references/delegate.md`](references/delegate.md) | 编写简报，并与执行者一起运行 构建 -> 审查 -> 修复 -> 合并 |
+| [`references/redteam.md`](references/redteam.md) | 对方案或提交的只读安全检查 |
+| [`references/audit.md`](references/audit.md) | 对合约系统或关键 API 的完整安全审计，共十个阶段 |
+| [`references/hardening.md`](references/hardening.md) | 把审查发现和纠正变成类型、lint 规则和测试 |
+| [`references/verification.md`](references/verification.md) | 在真实产物上验证：运行证据、功能地图、驱动脚本、属性测试与形式化检查 |
+| [`scripts/mode.mjs`](scripts/mode.mjs) | 列出、展示并校验模式；输出某个角色的启动参数 |
+| [`scripts/toolcheck.sh`](scripts/toolcheck.sh) | 列出已安装的安全分析工具，缺少的在报告中标为"未覆盖" |
 | [`references/harnesses.md`](references/harnesses.md) | 各工具的启动方式（Agent 工具、`claude -p`、`codex exec`、`opencode run`）、会话恢复、权限与坑点 |
 | [`references/checklist.md`](references/checklist.md) | 默认的审查前检查清单，以及项目如何积累自己的清单 |
 | [`references/operations.md`](references/operations.md) | 并发、车道归属、git、审查提示词、上下文控制、成本台账 |
@@ -218,6 +263,13 @@ Shell 脚本也在 Linux（`debian:bookworm-slim`）上验证过。
 
 欢迎提交 Issue 和 Pull Request。最有价值的贡献是来自真实审查发现的规则：描述反复出现的问题、对应的通用规则，
 以及它本可以如何被提前发现。请保持 `SKILL.md` 精简——细节放在 `references/` 中。
+
+## 致谢
+
+`direct` 模式、加固阶梯以及对验证的重视，借鉴了 Lauren Tan 的演讲 "All Code Is Slop (Except Mine)" 和她的
+[pstack](https://github.com/cursor/plugins/tree/main/pstack) 插件。`audit` 模式可与已安装的
+[Trail of Bits](https://github.com/trailofbits/skills) 和 [Pashov Audit Group](https://github.com/pashov/skills)
+技能配合使用；本仓库不包含它们的任何文本。
 
 ## 许可证
 

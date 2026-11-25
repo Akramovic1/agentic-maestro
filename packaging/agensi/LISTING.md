@@ -3,7 +3,7 @@
 **Name:** agentic-maestro
 
 **Tagline (short description):**
-Delegate coding work to cheaper sub-agents without losing quality: precise briefs, independent review, one launcher for Claude Code, Codex and OpenCode.
+High-quality code from coding agents in eight working modes: the strong model codes directly, conducts strong or cheap sub-agents, red-teams or audits. Independent review, one launcher for Claude Code, Codex and OpenCode.
 
 **Category:** Agents & Orchestration
 
@@ -18,6 +18,10 @@ writes exact rulings, arbitrates review findings and merges, while cheaper sub-a
 briefs and an independent reviewer checks every result.
 
 What you get:
+
+- **Eight modes in one editable file.** `direct`, `frontier`, `critical`, `economy`, `reserve`, `redteam`, `audit` and `harden`: each with a model for every role, an ordered task list and its own rules. `mode.mjs` validates the file and refuses a reviewer from the coder's own model family.
+- **Security matched to the work.** Ordinary code gets one independent review. Important APIs and smart contracts get a red team on the plan and on the commit; a full audit runs analyzers, a reviewer panel and property tests, and proves every finding with a failing test.
+- **Corrections become checks.** Recurring review findings are promoted to types, lint rules and tests before they become written rules.
 
 - **When to spawn at all.** A rule for when delegation pays and when the orchestrator should just do it inline.
 - **Briefs instead of context.** Templates for build, fix and integration briefs: exact rulings, a "done means" list, one pattern to copy, only the conventions that apply, and a fixed report block you can scan in seconds.
